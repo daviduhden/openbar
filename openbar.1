@@ -1,0 +1,64 @@
+.TH openbar 1 "July 2024" "1.0" "User Commands"
+.SH NAME
+openbar \- Status bar for cwm and other window managers on OpenBSD
+
+.SH SYNOPSIS
+.B openbar
+.RI [ options ]
+
+.SH DESCRIPTION
+.B openbar
+is a status bar application designed for the cwm window manager, but it can also be used with other window managers. It displays various system information including CPU speed and temperature, memory usage, window ID, load average, battery status, public and private IP addresses, and VPN connection status.
+
+.SH OPTIONS
+There are no command-line options for 
+.B openbar.
+Configuration is done through the configuration file 
+.B ~/.openbar.conf.
+
+.SH CONFIGURATION
+The configuration for 
+.B openbar
+is specified in the 
+.B ~/.openbar.conf
+file. See the 
+.B openbar.conf(5)
+manual page for more details.
+
+.SH USAGE
+To display 
+.B openbar
+in your window manager, add the following line to your 
+.B .xsession
+file:
+.EX
+exec ~/bin/openbar &
+.EE
+
+For 
+.B cwm,
+you might want to leave a gap at the top of the screen by adding the following to your 
+.B .cwmrc
+file:
+.EX
+gap 35 5 5 5
+.EE
+
+.SH FILES
+.B ~/.openbar.conf
+.RS 4
+Configuration file for 
+.B openbar.
+.RE
+
+.SH SEE ALSO
+.BR cwm (1),
+.BR tmux (1),
+.BR curl (1),
+.BR openbar.conf (5)
+
+.SH AUTHORS
+Gonzalo Rodriguez
+.RI < gonzalo@x61.sh >
+David Uhden Collado
+.RI < david@uhden.dev >

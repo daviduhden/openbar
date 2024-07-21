@@ -1,0 +1,127 @@
+.TH openbar.CONF 5 "July 2024" "1.0" "File Formats and Conventions"
+.SH NAME
+openbar.conf \- Configuration file for openbar
+
+.SH SYNOPSIS
+.B ~/.openbar.conf
+
+.SH DESCRIPTION
+.B openbar.conf
+is the configuration file for 
+.B openbar,
+a status bar application for cwm and other window managers. This file allows the user to specify various options to control what information is displayed by 
+.B openbar.
+
+.SH SYNTAX
+The configuration file consists of key-value pairs, one per line. The following options are available:
+
+.TP
+.B logo
+Specifies the logo or name to be displayed. Example:
+.EX
+logo=openbar
+.EE
+
+.TP
+.B date
+Specifies whether to display the current date and time. Example:
+.EX
+date=yes
+.EE
+
+.TP
+.B cpu
+Specifies whether to display the CPU speed and temperature. Example:
+.EX
+cpu=yes
+.EE
+
+.TP
+.B bat
+Specifies whether to display the battery status. Example:
+.EX
+bat=yes
+.EE
+
+.TP
+.B mem
+Specifies whether to display the free memory. Example:
+.EX
+mem=yes
+.EE
+
+.TP
+.B load
+Specifies whether to display the load average. Example:
+.EX
+load=yes
+.EE
+
+.TP
+.B net
+Specifies whether to display the public and private IP addresses. Example:
+.EX
+net=yes
+.EE
+
+.TP
+.B winid
+Specifies whether to display the current window ID. Example:
+.EX
+winid=yes
+.EE
+
+.TP
+.B hostname
+Specifies whether to display the hostname. Example:
+.EX
+hostname=yes
+.EE
+
+.TP
+.B interface
+Specifies the network interface to use for retrieving the internal IP address. Example:
+.EX
+interface=iwm0
+.EE
+
+.TP
+.B vpn
+Specifies whether to display the VPN connection status. Example:
+.EX
+vpn=yes
+.EE
+
+.SH EXAMPLE
+An example configuration file is shown below:
+.EX
+logo=openbar
+date=yes
+cpu=yes
+bat=yes
+mem=yes
+load=yes
+net=yes
+winid=yes
+hostname=yes
+interface=iwm0
+vpn=yes
+.EE
+
+.SH FILES
+.B ~/.openbar.conf
+.RS 4
+Configuration file for 
+.B openbar.
+.RE
+
+.SH SEE ALSO
+.BR openbar (1),
+.BR cwm (1),
+.BR tmux (1)
+
+.SH AUTHORS
+Gonzalo Rodriguez
+.RI < gonzalo@x61.sh >
+David Uhden Collado
+.RI < david@uhden.dev >
