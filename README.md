@@ -1,38 +1,35 @@
-# Termbar in C
+# OpenBar
 
-termbar(in C) is a status bar for cwm (or other wm) on OpenBSD (no idea if works on
-linux or other OS and also I don't care).
+`openbar` is a status bar written in C99 designed for `cwm` (or other window managers) on OpenBSD. 
 
-The idea was to make my original [termbar](https://github.com/gonzalo-/termbar/) in C and
-I took inspiration from [sdk's cbar](https://git.uugrn.org/sdk/cbar), it's hardly
-modified but yet, helped me a lot.
+> Currently this project does not support other operating systems nor does the maintainer have any intention of working on it.
 
-CAVEATS: This is a testing and still developing version, I tested in a couple machines
-so it might not work on yours or probably put on fire your laptop, so be careful and don't
-complain much, if you have some feedback you know where you can find me.
-
-![Termbar](termbar.png)
+**CAVEATS:** This version is still in development and testing. It has been tested on a few machines, but it may not work on all systems and could potentially cause issues. Use with caution and at your own risk. Feedback is welcome and appreciated.
 
 ## Features
 
-termbar for now can show you, a "logo" (or name), hostname, cpu speed and temp,
-free mem, window id, load average, battery status (probably only in thinkpads), public IP,
-private IP and if you are connected to a VPN.
+`openbar` currently supports the following features:
+- Displaying a "logo" or name
+- Hostname
+- CPU speed and temperature
+- Free memory
+- Window ID
+- Load average
+- Battery status (tested primarily on ThinkPads)
+- Public IP address
+- Private IP address
+- VPN connection status
 
-The battery percentage it will turn red if your machine is not connected to the AC as
-the VPN output will be "No VPN" in red if there is no wg(4) present or tunnel up (still on
-testing).
+The battery percentage will turn red if the machine is not connected to AC power. The VPN status will display "No VPN" in red if no WireGuard interface is present or if the tunnel is down (still in testing).
 
-If your CPU has no sensors or not supported it will show an "x" next to the CPU speed, you
-will probably see this on a VM or old machine (not very much tested).
+If the CPU has no sensors or is not supported, it will display an "x" next to the CPU speed, which is common in VMs or older machines (not extensively tested).
 
 ## Usage
 
-termbar has now a config file (which you should have in ~/.termbar.conf after the install),
-you have an example [here](termbar.conf) with all the options available:
+`openbar` now utilizes a configuration file, which should be located at `~/.openbar.conf` after installation. An example configuration file is available [here](openbar.conf) with all available options:
 
 ```
-logo=termbar
+logo=openbar
 date=yes
 cpu=yes
 bat=yes
@@ -45,48 +42,35 @@ interface=iwm0
 vpn=yes
 ```
 
-The only 2 options you can play with are "logo" and "interface", "logo" will just print
-something you put there and "interface" will be use to get the internal ip of your
-machine.
+The "logo" and "interface" options are configurable. "logo" will display any specified text, and "interface" is used to get the internal IP address of your machine.
 
-With the other options are pretty straigforward, "yes" to show the information on termbar
-and "no" to hide it.
+The other options are straightforward: set to "yes" to display the information on `openbar`, and "no" to hide it.
 
 ## Display
 
-For displaying termbar in your cwm or maybe another wm, you need to create a thin xterm that
-will show the output, for this you can add a similar line in your .xsession:
+To display `openbar` in your window manager, create an X11 window to show the output. Add a similar line to your `.xsession` file:
 
 ```
 ...
-# Termbar
-exec xterm -fs 12 -bg "black" -fg "grey" -name termbar -class termbar -T termbar -e ~/bin/termbar &
+# openbar
+exec ~/bin/openbar &
 ...
 exec cwm
 ```
 
-For cwm I usually let a gap on the top of the screen for termbar with the follow on my .cwmrc:
+For `cwm`, you might want to leave a gap at the top of the screen for `openbar` by adding the following to your `.cwmrc` file:
 
 ```
 ...
-gap						35 5 5 5
-...
-```
-
-The full files for cwm and .xsession are [here.](https://github.com/gonzalo-/termbar/).
-
-You probably can use termbar also in tmux as status bar, you might want to add or modify your
-~/.tmux.conf to something like:
-
-```
-...
-set -g status-right "#{exec ~/bin/termbar}"
+gap 35 5 5 5
 ...
 ```
 
 ## Dependencies
 
-In the current state you just need curl to check your public ip.
+Currently, `curl` is required to check your public IP address.
+
+Install it using:
 
 ```
 $ doas pkg_add curl
@@ -94,35 +78,26 @@ $ doas pkg_add curl
 
 ## Build
 
-You have all you need in your OpenBSD base installation, so by cloning the repo
-and building is as easy as:
+All necessary tools are included in your OpenBSD base installation. To clone the repository and build the project, use the following commands:
 
 ```
-$ git clone https://github.com/gonzalo-/termbarc/
-$ cd termbarc
+$ git clone https://github.com/gonzalo-/openbarc/
+$ cd openbarc
 $ make
-rm -f termbar
-cc -O0 -g -pipe -Wall -Werror -march=native -I. -o termbar  termbarc.c
 ```
 
 ## Installation
 
-termbar will go to your ${HOME}/bin directory, if you want to put it somewhere
-else you should modify the Makefile, otherwise make sure you have a ~/bin
-directory and then:
+`openbar` will be installed in your `${HOME}/bin` directory. If you want to place it elsewhere, modify the Makefile accordingly. Ensure you have a `~/bin` directory, then run:
 
 ```
 $ make install
-install -s termbar /home/gonzalo/bin/termbar
-install termbar.conf /home/gonzalo/.termbar.conf
 ```
 
 ## Uninstall
 
-If termbar it's not for you, you can uninstall it with:
+To uninstall `openbar`, run:
 
 ```
 $ make uninstall
-rm -f /home/gonzalo/bin/termbar
-rm -f /home/gonzalo/.termbar.conf
 ```
