@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2024 Gonzalo Rodriguez (gonzalo@x61.sh)
+ * Copyright (c) 2024 Gonzalo Rodriguez <gonzalo@x61.sh>
+ * Copyright (c) 2024 David Uhden Collado <david@uhden.dev>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,20 +27,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef TERMBARC_H
+#define TERMBARC_H
+
+// Definitions for various lengths and sizes used in the program
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
 #define MAX_LINE_LENGTH 256
 #define MAX_OUTPUT_LENGTH 16
 #define HOSTNAME_MAX_LENGTH 256
 
-// Define ANSI escape codes for color formatting
-#define PURPLE      "\x1b[38;2;138;43;226m"
-#define ORANGE      "\x1b[38;2;255;165;0m"
-#define GREEN       "\x1b[38;2;0;128;0m"
-#define YELLOW      "\x1b[38;2;255;255;0m"
-#define RED         "\x1b[38;2;255;0;0m"
-#define RESET       "\x1b[0m"
-
+// Global variables for storing various system information
 static char battery_percent[32];
 static char cpu_temp[32];
 static char cpu_base_speed[32];
@@ -52,3 +50,5 @@ char mem_info[32];
 char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
+
+#endif // TERMBARC_H
