@@ -69,6 +69,7 @@ struct Config {
 	int show_winid;
 	int show_net;
 	int show_vpn;
+	int background_color;
 };
 
 // Function to extract the logo from a configuration line
@@ -173,6 +174,10 @@ struct Config config_file() {
 			config.show_hostname = 1;
 		} else if (strstr(line, "vpn=yes")) {
 			config.show_vpn = 1;
+		} else if (strstr(line, "background=black")) {
+			config.background_color = 1;
+		} else if (strstr(line, "background=white")) {
+			config.background_color = 0;
 		}
 	}
 
@@ -453,14 +458,29 @@ int main(int argc, const char *argv[]) {
 	int screen = DefaultScreen(display);
 	unsigned long black = BlackPixel(display, screen);
 	unsigned long white = WhitePixel(display, screen);
+	unsigned long bg_color = (config.background_color == 1) ? black : white;
+	unsigned long fg_color = (config.background_color == 1) ? white : black;
+
+	// Get screen dimensions
+	int screen_width = DisplayWidth(display, screen);
+	int screen_height = DisplayHeight(display, screen);
+	int bar_width = screen_width;  // Width of the bar set to screen width
+	int bar_height = 30;  // Height of the bar
+	int x = 0;  // Start position of the bar
+	int y = 0;  // Position the bar at the top
 
 	// Create window
-	Window window = XCreateSimpleWindow(display, RootWindow(display, screen), 0, 0, 800, 30, 1, black, white);
+	Window window = XCreateSimpleWindow(display, RootWindow(display, screen), x, y, bar_width, bar_height, 1, fg_color, bg_color);
 	XStoreName(display, window, "Status Bar");
+
+	// Set window to be always on top and avoid being managed by the window manager
+	XSetWindowAttributes attrs;
+	attrs.override_redirect = True;
+	XChangeWindowAttributes(display, window, CWOverrideRedirect, &attrs);
 
 	// Create GC (Graphics Context)
 	GC gc = XCreateGC(display, window, 0, NULL);
-	XSetForeground(display, gc, black);
+	XSetForeground(display, gc, fg_color);
 
 	// Show the window
 	XMapWindow(display, window);
@@ -468,33 +488,33 @@ int main(int argc, const char *argv[]) {
 	// Main event loop
 	while (1) {
 		XClearWindow(display, window);
-		int x = 10;  // Starting X position for text
+		int text_x = 10;  // Starting X position for text
 
 		// Update and display window ID if enabled
 		if (config.show_winid) {
 			update_windowid(window_id);
-			draw_text(display, window, gc, x, 20, window_id);
-			x += 100;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, window_id);
+			text_x += 100;  // Adjust X position for next text
 		}
 
 		// Display logo if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
-			draw_text(display, window, gc, x, 20, config.logo);
-			x += 100;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, config.logo);
+			text_x += 100;  // Adjust X position for next text
 		}
 
 		// Update and display hostname if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
-			draw_text(display, window, gc, x, 20, hostname);
-			x += 100;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, hostname);
+			text_x += 100;  // Adjust X position for next text
 		}
 
 		// Update and display date/time if enabled
 		if (config.show_date) {
 			update_datetime();
-			draw_text(display, window, gc, x, 20, datetime);
-			x += 150;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, datetime);
+			text_x += 150;  // Adjust X position for next text
 		}
 
 		// Update and display CPU information if enabled
@@ -504,16 +524,16 @@ int main(int argc, const char *argv[]) {
 			update_cpu_base_speed();
 			char cpu_info[MAX_OUTPUT_LENGTH];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
-			draw_text(display, window, gc, x, 20, cpu_info);
-			x += 200;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, cpu_info);
+			text_x += 200;  // Adjust X position for next text
 		}
 
 		// Update and display memory usage if enabled
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
-			draw_text(display, window, gc, x, 20, mem_info);
-			x += 150;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, mem_info);
+			text_x += 150;  // Adjust X position for next text
 		}
 
 		// Update and display system load if enabled
@@ -521,21 +541,21 @@ int main(int argc, const char *argv[]) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
-			draw_text(display, window, gc, x, 20, load_info);
-			x += 150;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, load_info);
+			text_x += 150;  // Adjust X position for next text
 		}
 
 		// Update and display battery status if enabled
 		if (config.show_bat) {
 			update_battery();
-			draw_text(display, window, gc, x, 20, battery_percent);
-			x += 100;  // Adjust X position for next text
+			draw_text(display, window, gc, text_x, 20, battery_percent);
+			text_x += 100;  // Adjust X position for next text
 		}
 
 		// Update and display VPN status if enabled
 		if (config.show_vpn) {
 			update_vpn();
-			x += 100;  // Adjust X position for next text
+			text_x += 100;  // Adjust X position for next text
 		}
 
 		// Update and display network information if enabled
@@ -544,7 +564,7 @@ int main(int argc, const char *argv[]) {
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
-			draw_text(display, window, gc, x, 20, net_info);
+			draw_text(display, window, gc, text_x, 20, net_info);
 		}
 
 		XFlush(display);  // Flush the X11 buffer to update the window
