@@ -56,7 +56,7 @@ exec cwm & exec openbar
 For `cwm`, you might want to leave a gap at the top of the screen for `openbar` by adding the following to your `.cwmrc` file:
 
 ```sh
-gap 35 5 5 5
+gap 20
 ```
 
 ## Dependencies
