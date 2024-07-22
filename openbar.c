@@ -463,7 +463,6 @@ int main(int argc, const char *argv[]) {
 
 	// Get screen dimensions
 	int screen_width = DisplayWidth(display, screen);
-	int screen_height = DisplayHeight(display, screen);
 	int bar_width = screen_width;  // Width of the bar set to screen width
 	int bar_height = 30;  // Height of the bar
 	int x = 0;  // Start position of the bar
