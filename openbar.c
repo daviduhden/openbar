@@ -261,9 +261,9 @@ void update_vpn() {
 	freeifaddrs(ifap);
 
 	if (has_wg_interface)
-		printf(" %sVPN%s ", "\033[32m", "\033[0m");
+		printf(" VPN ");
 	else
-		printf(" %sNo VPN%s ", "\033[31m", "\033[0m");
+		printf(" No VPN ");
 }
 
 // Function to update memory usage
@@ -382,7 +382,7 @@ void update_battery() {
 	if (pi.ac_state == APM_AC_ON) {
 		snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
 	} else {
-		snprintf(battery_percent, sizeof(battery_percent), "%s%d%%%s", "\033[31m", pi.battery_life, "\033[0m");
+		snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
 	}
 }
 

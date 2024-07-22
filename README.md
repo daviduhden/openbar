@@ -15,14 +15,12 @@
 - Free memory
 - Window ID
 - Load average
-- Battery status (tested primarily on ThinkPads)
+- Battery status
 - Public IP address
 - Private IP address
 - VPN connection status
 
-The battery percentage will turn red if the machine is not connected to AC power and the VPN status will display "No VPN" in red if no WireGuard interface is present or if the tunnel is down.
-
-If the CPU has no sensors or is not supported, it will display an "x" next to the CPU speed, which is common in VMs or older machines (not extensively tested).
+If the CPU has no sensors or is not supported, it will display an "x" next to the CPU speed, which is common in VMs or older machines.
 
 ## Usage
 
