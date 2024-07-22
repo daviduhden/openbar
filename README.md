@@ -77,7 +77,11 @@ All necessary tools are included in your OpenBSD base installation. To clone the
 
 ```sh
 git clone https://github.com/daviduhden/openbar/
+```
+```sh
 cd openbar
+```
+```sh
 make
 ```
 
