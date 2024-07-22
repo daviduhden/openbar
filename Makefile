@@ -11,11 +11,11 @@ INCLUDEDIR = -I.
 # Targets
 TARGET = openbar
 CONFIG = openbar.conf
-BINDIR = ${HOME}/bin
+BINDIR = /usr/local/bin
 CONFIGDIR = ${HOME}
-MANDIR = ${HOME}/man
+MANDIR = /usr/local/man
 INSTALLTARGET = ${BINDIR}/${TARGET}
-INSTALLCONFIG = ${CONFIGDIR}/.${CONFIG}
+INSTALLCONFIG = ${CONFIGDIR}/${CONFIG}
 MAN1 = ${MANDIR}/man1
 MAN5 = ${MANDIR}/man5
 
