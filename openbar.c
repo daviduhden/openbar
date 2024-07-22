@@ -56,11 +56,6 @@
 
 #include "openbar.h"
 
-#define MAX_LINE_LENGTH 256
-#define MAX_IP_LENGTH 128
-#define HOSTNAME_MAX_LENGTH 256
-#define MAX_OUTPUT_LENGTH 256
-
 // Struct for configuration settings
 struct Config {
 	char *logo;
@@ -182,7 +177,7 @@ struct Config config_file() {
 // Function to update the public IP address
 void update_public_ip() {
 	FILE *fp;
-	char buffer[128];
+	char buffer[32];
 
 	// Using curl to get the public IP address
 	fp = popen("/usr/local/bin/curl -s ifconfig.me", "r");
