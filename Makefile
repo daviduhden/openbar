@@ -10,7 +10,7 @@ INCLUDEDIR = -I/usr/X11R6/include -I.
 TARGET = openbar
 CONFIG = openbar.conf
 BINDIR = /usr/local/bin
-CONFIGDIR = ${HOME}
+CONFIGDIR = /etc
 MANDIR = /usr/local/man
 INSTALLTARGET = ${BINDIR}/${TARGET}
 INSTALLCONFIG = ${CONFIGDIR}/${CONFIG}
@@ -36,9 +36,11 @@ opt: clean
 # Install target to copy the executable, config, and man pages to appropriate directories
 .PHONY: install
 install: ${TARGET}
-	@echo "Installing ${TARGET} to ${INSTALLTARGET} and ${CONFIG} to ${INSTALLCONFIG}..."
+	@echo "Installing ${TARGET} to ${INSTALLTARGET}..."
 	@mkdir -p ${BINDIR}
 	@install -s ${TARGET} ${INSTALLTARGET}
+	@echo "Installing ${CONFIG} to ${INSTALLCONFIG}..."
+	@mkdir -p ${CONFIGDIR}
 	@install -m 644 ${CONFIG} ${INSTALLCONFIG}
 	@echo "Installing man pages to ${MAN1} and ${MAN5}..."
 	@mkdir -p ${MAN1}
@@ -55,8 +57,9 @@ clean:
 # Uninstall target to remove the installed files
 .PHONY: uninstall
 uninstall:
-	@echo "Uninstalling ${INSTALLTARGET} and ${INSTALLCONFIG}..."
+	@echo "Uninstalling ${INSTALLTARGET}..."
 	@rm -f ${INSTALLTARGET}
+	@echo "Removing ${INSTALLCONFIG}..."
 	@rm -f ${INSTALLCONFIG}
 	@echo "Removing man pages from ${MAN1} and ${MAN5}..."
 	@rm -f ${MAN1}/openbar.1
@@ -67,3 +70,4 @@ uninstall:
 debug: build
 	@echo "Starting debugger for ${TARGET}..."
 	@egdb -q ./${TARGET} -ex "break main" -ex "run"
+	

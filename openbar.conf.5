@@ -9,6 +9,13 @@ is the configuration file for
 a status bar application for cwm and other window managers. This file allows the user to specify various options to control what information is displayed by 
 .B openbar.
 
+The configuration file can be located in the user's home directory as
+.B ~/.openbar.conf
+or in the global directory as
+.B /etc/openbar.conf.
+
+If both files are present, the file in the user's home directory will take precedence.
+
 .SH SYNTAX
 The configuration file consists of key-value pairs, one per line. The following options are available:
 
@@ -108,7 +115,12 @@ vpn=yes
 .SH FILES
 .B ~/.openbar.conf
 .RS 4
-Configuration file for 
+User-specific configuration file for 
+.B openbar.
+.RE
+.B /etc/openbar.conf
+.RS 4
+Global configuration file for 
 .B openbar.
 .RE
 

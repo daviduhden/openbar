@@ -9,16 +9,17 @@ is a status bar application designed for the cwm window manager, but it can also
 .SH OPTIONS
 There are no command-line options for 
 .B openbar.
-Configuration is done through the configuration file 
+Configuration is done through the configuration file located in your home directory as 
 .B ~/.openbar.conf 
-located in your home directory.
+or in the global directory as
+.B /etc/openbar.conf.
+
+If both files are present, the file in the user's home directory will take precedence.
 
 .SH CONFIGURATION
 The configuration for 
 .B openbar
-is specified in the 
-.B ~/.openbar.conf
-file. See the 
+is specified in the configuration file. See the 
 .B openbar.conf(5)
 manual page for more details.
 
@@ -44,7 +45,12 @@ gap 35 5 5 5
 .SH FILES
 .B ~/.openbar.conf
 .RS 4
-Configuration file for 
+User-specific configuration file for 
+.B openbar.
+.RE
+.B /etc/openbar.conf
+.RS 4
+Global configuration file for 
 .B openbar.
 .RE
 

@@ -113,6 +113,7 @@ struct Config config_file() {
 	FILE *file = NULL;
 	char config_file_path[256];
 
+	// Search for the config file in the home directory
 	for (int i = 0; i < 2; ++i) {
 		snprintf(config_file_path, sizeof(config_file_path), "%s/%s", home_dir, config_file_names[i]);
 		file = fopen(config_file_path, "r");
@@ -121,9 +122,14 @@ struct Config config_file() {
 		}
 	}
 
+	// If config file not found in home directory, search in etc directory
 	if (file == NULL) {
-		fprintf(stderr, "Error: Unable to open config file\n");
-		exit(EXIT_FAILURE);
+		snprintf(config_file_path, sizeof(config_file_path), "/etc/%s", config_file_names[0]);
+		file = fopen(config_file_path, "r");
+		if (file == NULL) {
+			fprintf(stderr, "Error: Unable to open config file\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	char line[MAX_LINE_LENGTH];
