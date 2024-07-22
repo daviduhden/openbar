@@ -2,7 +2,7 @@
 
 `openbar` is a status bar written in C99 designed for `cwm` (or other window managers) on OpenBSD. Any contribution is highly appreciated.
 
-> Currently this project does not support other operating systems nor does the maintainer have any intention of working on it.
+> Currently, this project does not support other operating systems, nor does the maintainer have any intention of working on it.
 
 **CAVEATS:** This version is still in development and testing. It has been tested on a few machines, but it may not work on all systems and could potentially cause issues. Use with caution and at your own risk. Feedback is welcome and appreciated.
 
@@ -20,15 +20,15 @@
 - Private IP address
 - VPN connection status
 
-The battery percentage will turn red if the machine is not connected to AC power. The VPN status will display "No VPN" in red if no WireGuard interface is present or if the tunnel is down (still in testing).
+The battery percentage will turn red if the machine is not connected to AC power and the VPN status will display "No VPN" in red if no WireGuard interface is present or if the tunnel is down.
 
 If the CPU has no sensors or is not supported, it will display an "x" next to the CPU speed, which is common in VMs or older machines (not extensively tested).
 
 ## Usage
 
-`openbar` now utilizes a configuration file, which should be located at `~/.openbar.conf` after installation. An example configuration file is available [here](openbar.conf) with all available options:
+`openbar` uses a configuration file that should be located in your home directory as `.openbar.conf` after installation. You can find an example configuration file with all available options [here](openbar.conf):
 
-```
+```ini
 logo=openbar
 date=yes
 cpu=yes
@@ -50,20 +50,15 @@ The other options are straightforward: set to "yes" to display the information o
 
 To display `openbar` in your window manager, create an X11 window to show the output. Add a similar line to your `.xsession` file:
 
-```
-...
-# openbar
-exec ~/bin/openbar &
-...
-exec cwm
+```sh
+# run cwm along with openbar
+exec cwm & exec openbar
 ```
 
 For `cwm`, you might want to leave a gap at the top of the screen for `openbar` by adding the following to your `.cwmrc` file:
 
-```
-...
+```sh
 gap 35 5 5 5
-...
 ```
 
 ## Dependencies
@@ -72,32 +67,32 @@ Currently, `curl` is required to check your public IP address.
 
 Install it using:
 
-```
-$ doas pkg_add curl
+```sh
+pkg_add curl
 ```
 
-## Build
+## Building
 
 All necessary tools are included in your OpenBSD base installation. To clone the repository and build the project, use the following commands:
 
-```
-$ git clone https://github.com/gonzalo-/openbarc/
-$ cd openbarc
-$ make
-```
-
-## Installation
-
-`openbar` will be installed in your `${HOME}/bin` directory. If you want to place it elsewhere, modify the Makefile accordingly. Ensure you have a `~/bin` directory, then run:
-
-```
-$ make install
+```sh
+git clone https://github.com/daviduhden/openbar/
+cd openbar
+make
 ```
 
-## Uninstall
+## Installing
+
+By default, `openbar` will be installed in `/usr/local/bin` and the configuration file in `.openbar.conf`. Ensure you have the appropriate permissions and then run:
+
+```sh
+make install
+```
+
+## Uninstalling
 
 To uninstall `openbar`, run:
 
-```
-$ make uninstall
+```sh
+make uninstall
 ```
