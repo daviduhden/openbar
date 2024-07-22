@@ -495,35 +495,41 @@ int main(int argc, const char *argv[]) {
 	// Main event loop
 	while (1) {
 		XClearWindow(display, window);
-		int text_x = 5;  // Starting X position for text
-		const int text_y = 15;  // Y position for text, adjusted for smaller height
-		const int spacing = 10;  // Reduced spacing between text items
 
-		// Update and display window ID if enabled
+		// Calculate the total width of the text
+		int total_text_width = 0;
+		char text_buffer[1024];
+		text_buffer[0] = '\0';
+
+		// Collect and calculate width of each part of the text
 		if (config.show_winid) {
 			update_windowid(window_id);
-			draw_text(display, window, gc, text_x, text_y, window_id);
-			text_x += XTextWidth(font_info, window_id, strlen(window_id)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, window_id);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, window_id, strlen(window_id)) + 5;  // Add spacing
 		}
 
 		// Display logo if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
-			draw_text(display, window, gc, text_x, text_y, config.logo);
-			text_x += XTextWidth(font_info, config.logo, strlen(config.logo)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, config.logo);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, config.logo, strlen(config.logo)) + 5;  // Add spacing
 		}
-
+		
 		// Update and display hostname if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
-			draw_text(display, window, gc, text_x, text_y, hostname);
-			text_x += XTextWidth(font_info, hostname, strlen(hostname)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, hostname);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, hostname, strlen(hostname)) + 5;  // Add spacing
 		}
 
 		// Update and display date/time if enabled
 		if (config.show_date) {
 			update_datetime();
-			draw_text(display, window, gc, text_x, text_y, datetime);
-			text_x += XTextWidth(font_info, datetime, strlen(datetime)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, datetime);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, datetime, strlen(datetime)) + 5;  // Add spacing
 		}
 
 		// Update and display CPU information if enabled
@@ -533,16 +539,18 @@ int main(int argc, const char *argv[]) {
 			update_cpu_base_speed();
 			char cpu_info[MAX_OUTPUT_LENGTH];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
-			draw_text(display, window, gc, text_x, text_y, cpu_info);
-			text_x += XTextWidth(font_info, cpu_info, strlen(cpu_info)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, cpu_info);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, cpu_info, strlen(cpu_info)) + 5;  // Add spacing
 		}
 
 		// Update and display memory usage if enabled
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
-			draw_text(display, window, gc, text_x, text_y, mem_info);
-			text_x += XTextWidth(font_info, mem_info, strlen(mem_info)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, mem_info);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, mem_info, strlen(mem_info)) + 5;  // Add spacing
 		}
 
 		// Update and display system load if enabled
@@ -550,22 +558,24 @@ int main(int argc, const char *argv[]) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
-			draw_text(display, window, gc, text_x, text_y, load_info);
-			text_x += XTextWidth(font_info, load_info, strlen(load_info)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, load_info);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, load_info, strlen(load_info)) + 5;  // Add spacing
 		}
 
 		// Update and display battery status if enabled
 		if (config.show_bat) {
 			update_battery();
-			draw_text(display, window, gc, text_x, text_y, battery_percent);
-			text_x += XTextWidth(font_info, battery_percent, strlen(battery_percent)) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, battery_percent);
+			strcat(text_buffer, " ");
+			total_text_width += XTextWidth(font_info, battery_percent, strlen(battery_percent)) + 5;  // Add spacing
 		}
 
 		// Update and display VPN status if enabled
 		if (config.show_vpn) {
 			update_vpn();
-			// For VPN status, we assume the printed text is "VPN" or "No VPN"
-			text_x += XTextWidth(font_info, "VPN", strlen("VPN")) + spacing;  // Adjust X position for next text
+			strcat(text_buffer, "VPN ");
+			total_text_width += XTextWidth(font_info, "VPN", strlen("VPN")) + 5;  // Add spacing
 		}
 
 		// Update and display network information if enabled
@@ -574,8 +584,16 @@ int main(int argc, const char *argv[]) {
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
-			draw_text(display, window, gc, text_x, text_y, net_info);
+			strcat(text_buffer, net_info);
+			total_text_width += XTextWidth(font_info, net_info, strlen(net_info));
 		}
+
+		// Center the text horizontally
+		int text_x = (bar_width - total_text_width) / 2;
+		const int text_y = 15;  // Y position for text, adjusted for smaller height
+
+		// Draw the centered text
+		draw_text(display, window, gc, text_x, text_y, text_buffer);
 
 		XFlush(display);  // Flush the X11 buffer to update the window
 		usleep(2000000);  // Sleep for 2 seconds before the next update
