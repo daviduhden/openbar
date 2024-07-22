@@ -18,6 +18,7 @@ MAN1 = ${MANDIR}/man1
 MAN5 = ${MANDIR}/man5
 
 # Default target to build the project
+.PHONY: all
 all: build
 
 # Build target with debugging flags
