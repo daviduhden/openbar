@@ -504,31 +504,31 @@ int main(int argc, const char *argv[]) {
 		// Collect and calculate width of each part of the text
 		if (config.show_winid) {
 			update_windowid(window_id);
-			strcat(text_buffer, window_id);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, window_id, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, window_id, strlen(window_id)) + 5;  // Add spacing
 		}
 
 		// Display logo if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
-			strcat(text_buffer, config.logo);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, config.logo, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, config.logo, strlen(config.logo)) + 5;  // Add spacing
 		}
 		
 		// Update and display hostname if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
-			strcat(text_buffer, hostname);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, hostname, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, hostname, strlen(hostname)) + 5;  // Add spacing
 		}
 
 		// Update and display date/time if enabled
 		if (config.show_date) {
 			update_datetime();
-			strcat(text_buffer, datetime);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, datetime, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, datetime, strlen(datetime)) + 5;  // Add spacing
 		}
 
@@ -539,8 +539,8 @@ int main(int argc, const char *argv[]) {
 			update_cpu_base_speed();
 			char cpu_info[MAX_OUTPUT_LENGTH];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
-			strcat(text_buffer, cpu_info);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, cpu_info, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, cpu_info, strlen(cpu_info)) + 5;  // Add spacing
 		}
 
@@ -548,8 +548,8 @@ int main(int argc, const char *argv[]) {
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
-			strcat(text_buffer, mem_info);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, mem_info, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, mem_info, strlen(mem_info)) + 5;  // Add spacing
 		}
 
@@ -558,23 +558,23 @@ int main(int argc, const char *argv[]) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
-			strcat(text_buffer, load_info);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, load_info, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, load_info, strlen(load_info)) + 5;  // Add spacing
 		}
 
 		// Update and display battery status if enabled
 		if (config.show_bat) {
 			update_battery();
-			strcat(text_buffer, battery_percent);
-			strcat(text_buffer, " ");
+			strlcat(text_buffer, battery_percent, sizeof(text_buffer));
+			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, battery_percent, strlen(battery_percent)) + 5;  // Add spacing
 		}
 
 		// Update and display VPN status if enabled
 		if (config.show_vpn) {
 			update_vpn();
-			strcat(text_buffer, "VPN ");
+			strlcat(text_buffer, "VPN ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, "VPN", strlen("VPN")) + 5;  // Add spacing
 		}
 
@@ -584,7 +584,7 @@ int main(int argc, const char *argv[]) {
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
-			strcat(text_buffer, net_info);
+			strlcat(text_buffer, net_info, sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, net_info, strlen(net_info));
 		}
 
