@@ -72,6 +72,7 @@ struct Config {
 	int show_vpn;
 	unsigned long foreground_color;
 	unsigned long background_color;
+	char *font;
 };
 
 // Function to extract the logo from a configuration line
@@ -105,7 +106,7 @@ char *extract_logo(const char *line) {
 
 // Function to read configuration settings from a file
 struct Config config_file() {
-	struct Config config = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct Config config = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL};
 	const char *home_dir = getenv("HOME");
 	if (home_dir == NULL) {
 		fprintf(stderr, "Error: HOME environment variable not set\n");
@@ -213,12 +214,22 @@ void read_xresources(Display *display, struct Config *config) {
 				XrmGetResource(db, "OpenBar*background", "String", &type, &value) == True ||
 				XrmGetResource(db, "openbar*background", "String", &type, &value) == True ||
 				XrmGetResource(db, "*.background", "String", &type, &value) == True ||
-				XrmGetResource(db, "*.background", "String", &type, &value) == True) {
+				XrmGetResource(db, "*background", "String", &type, &value) == True) {
 				XColor color;
 				Colormap colormap = DefaultColormap(display, DefaultScreen(display));
 				if (XParseColor(display, colormap, value.addr, &color) && XAllocColor(display, colormap, &color)) {
 					config->background_color = color.pixel;
 				}
+			}
+
+			// Read font
+			if (XrmGetResource(db, "OpenBar.font", "String", &type, &value) == True ||
+				XrmGetResource(db, "openbar.font", "String", &type, &value) == True ||
+				XrmGetResource(db, "OpenBar*font", "String", &type, &value) == True ||
+				XrmGetResource(db, "openbar*font", "String", &type, &value) == True ||
+				XrmGetResource(db, "*.font", "String", &type, &value) == True ||
+				XrmGetResource(db, "*font", "String", &type, &value) == True) {
+				config->font = strdup(value.addr);
 			}
 
 			XrmDestroyDatabase(db);
@@ -526,7 +537,7 @@ int main(int argc, const char *argv[]) {
 	XSetForeground(display, gc, fg_color);
 
 	// Load font
-	XFontStruct *font_info = XLoadQueryFont(display, "fixed");
+	XFontStruct *font_info = XLoadQueryFont(display, config.font ? config.font : "fixed");
 	if (!font_info) {
 		fprintf(stderr, "Unable to load font\n");
 		return 1;
