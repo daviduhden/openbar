@@ -513,8 +513,8 @@ int main(int argc, const char *argv[]) {
 	int screen = DefaultScreen(display);
 	unsigned long black = BlackPixel(display, screen);
 	unsigned long white = WhitePixel(display, screen);
-	unsigned long bg_color = config.background_color ? config.background_color : black;
-	unsigned long fg_color = config.foreground_color ? config.foreground_color : white;
+	unsigned long bg_color = config.background_color ? config.background_color : white;
+	unsigned long fg_color = config.foreground_color ? config.foreground_color : black;
 
 	// Get screen dimensions
 	int screen_width = DisplayWidth(display, screen);
