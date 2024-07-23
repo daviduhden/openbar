@@ -106,7 +106,7 @@ char *extract_logo(const char *line) {
 
 // Function to read configuration settings from a file
 struct Config config_file() {
-	struct Config config = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL};
+	struct Config config = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL};
 	const char *home_dir = getenv("HOME");
 	if (home_dir == NULL) {
 		fprintf(stderr, "Error: HOME environment variable not set\n");
