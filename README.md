@@ -38,6 +38,7 @@ winid=yes
 hostname=yes
 interface=iwm0
 vpn=yes
+background=white
 ```
 
 The "logo" and "interface" options are configurable. "logo" will display any specified text, and "interface" is used to get the internal IP address of your machine.
@@ -85,7 +86,7 @@ make
 
 ## Installing
 
-By default, `openbar` will be installed in `/usr/local/bin` and the configuration file in `.openbar.conf`. Ensure you have the appropriate permissions and then run:
+By default, `openbar` will be installed in `/usr/local/bin` and the configuration file in `/etc/openbar.conf`. Ensure you have the appropriate permissions and then run:
 
 ```sh
 make install
