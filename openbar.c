@@ -357,7 +357,7 @@ void update_cpu_temp() {
 		int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
-			if (temp >= 0 && temp <= 100) {  // hmmm could be more than 100?
+			if (temp >= 0 && temp <= 100) {
 				snprintf(cpu_temp, sizeof(cpu_temp), "%d\302\260C", temp);
 				return;
 			}
@@ -470,7 +470,7 @@ int main(int argc, const char *argv[]) {
 
 	// Create window
 	Window window = XCreateSimpleWindow(display, RootWindow(display, screen), x, y, bar_width, bar_height, 1, fg_color, bg_color);
-	XStoreName(display, window, "Status Bar");
+	XStoreName(display, window, "OpenBar");
 
 	// Set window to be always on top and avoid being managed by the window manager
 	XSetWindowAttributes attrs;
