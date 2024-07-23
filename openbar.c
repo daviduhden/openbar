@@ -195,7 +195,11 @@ void read_xresources(Display *display, struct Config *config) {
 
 			// Read foreground color
 			if (XrmGetResource(db, "OpenBar.foreground", "String", &type, &value) == True ||
-				XrmGetResource(db, "*.foreground", "String", &type, &value) == True) {
+				XrmGetResource(db, "openbar.foreground", "String", &type, &value) == True ||
+				XrmGetResource(db, "OpenBar*foreground", "String", &type, &value) == True ||
+				XrmGetResource(db, "openbar*foreground", "String", &type, &value) == True ||
+				XrmGetResource(db, "*.foreground", "String", &type, &value) == True ||
+				XrmGetResource(db, "*foreground", "String", &type, &value) == True) {
 				XColor color;
 				Colormap colormap = DefaultColormap(display, DefaultScreen(display));
 				if (XParseColor(display, colormap, value.addr, &color) && XAllocColor(display, colormap, &color)) {
@@ -205,6 +209,10 @@ void read_xresources(Display *display, struct Config *config) {
 
 			// Read background color
 			if (XrmGetResource(db, "OpenBar.background", "String", &type, &value) == True ||
+				XrmGetResource(db, "openbar.background", "String", &type, &value) == True ||
+				XrmGetResource(db, "OpenBar*background", "String", &type, &value) == True ||
+				XrmGetResource(db, "openbar*background", "String", &type, &value) == True ||
+				XrmGetResource(db, "*.background", "String", &type, &value) == True ||
 				XrmGetResource(db, "*.background", "String", &type, &value) == True) {
 				XColor color;
 				Colormap colormap = DefaultColormap(display, DefaultScreen(display));
