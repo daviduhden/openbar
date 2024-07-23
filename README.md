@@ -85,7 +85,7 @@ make
 
 ## Installing
 
-By default, `openbar` will be installed in `/usr/local/bin` and the configuration file in `/etc/openbar.conf`. Ensure you have the appropriate permissions and then run:
+By default, `openbar` will be installed in `/usr/local/bin` and the configuration file in `.openbar.conf`. Ensure you have the appropriate permissions and then run:
 
 ```sh
 make install

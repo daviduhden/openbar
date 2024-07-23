@@ -1,6 +1,6 @@
 # Compiler and flags
 CC ?= cc
-LIBS = -L/usr/X11R6/lib -lX11 -lXext
+LIBS = -L/usr/X11R6/lib -lX11
 OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
 CFLAGS = -pipe -Wall -Werror -march=native
@@ -70,3 +70,4 @@ uninstall:
 debug: build
 	@echo "Starting debugger for ${TARGET}..."
 	@egdb -q ./${TARGET} -ex "break main" -ex "run"
+	

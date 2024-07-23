@@ -53,7 +53,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
-#include <X11/Xresource.h>
 
 #include "openbar.h"
 
@@ -70,9 +69,7 @@ struct Config {
 	int show_winid;
 	int show_net;
 	int show_vpn;
-	unsigned long foreground_color;
-	unsigned long background_color;
-	char *font;
+	int background_color;
 };
 
 // Function to extract the logo from a configuration line
@@ -92,7 +89,7 @@ char *extract_logo(const char *line) {
 		size_t logo_length = logo_end - logo_start;
 
 		// Allocate memory for the logo and copy it
-		char *logo = (char *)malloc((logo_length + 1) * sizeof(char));
+		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
 		if (logo == NULL) {
 			perror("No logo.");
 			exit(EXIT_FAILURE);
@@ -106,14 +103,14 @@ char *extract_logo(const char *line) {
 
 // Function to read configuration settings from a file
 struct Config config_file() {
-	struct Config config = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL};
+	struct Config config = { NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
 	const char *home_dir = getenv("HOME");
 	if (home_dir == NULL) {
 		fprintf(stderr, "Error: HOME environment variable not set\n");
 		exit(EXIT_FAILURE);
 	}
 
-	const char *config_file_names[] = {"openbar.conf", ".openbar.conf"};
+	const char *config_file_names[] = { "openbar.conf", ".openbar.conf" };
 	FILE *file = NULL;
 	char config_file_path[256];
 
@@ -177,58 +174,15 @@ struct Config config_file() {
 			config.show_hostname = 1;
 		} else if (strstr(line, "vpn=yes")) {
 			config.show_vpn = 1;
+		} else if (strstr(line, "background=black")) {
+			config.background_color = 1;
+		} else if (strstr(line, "background=white")) {
+			config.background_color = 0;
 		}
 	}
 
 	fclose(file);
 	return config;
-}
-
-// Function to read Xresources
-void read_xresources(Display *display, struct Config *config) {
-	XrmInitialize();
-	char *resource_manager = XResourceManagerString(display);
-	if (resource_manager != NULL) {
-		XrmDatabase db = XrmGetStringDatabase(resource_manager);
-		if (db != NULL) {
-			char *type;
-			XrmValue value;
-
-			// Read foreground color
-			if (XrmGetResource(db, "OpenBar.foreground", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar.foreground", "String", &type, &value) == True ||
-				XrmGetResource(db, "OpenBar*foreground", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar*foreground", "String", &type, &value) == True) {
-				XColor color;
-				Colormap colormap = DefaultColormap(display, DefaultScreen(display));
-				if (XParseColor(display, colormap, value.addr, &color) && XAllocColor(display, colormap, &color)) {
-					config->foreground_color = color.pixel;
-				}
-			}
-
-			// Read background color
-			if (XrmGetResource(db, "OpenBar.background", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar.background", "String", &type, &value) == True ||
-				XrmGetResource(db, "OpenBar*background", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar*background", "String", &type, &value) == True) {
-				XColor color;
-				Colormap colormap = DefaultColormap(display, DefaultScreen(display));
-				if (XParseColor(display, colormap, value.addr, &color) && XAllocColor(display, colormap, &color)) {
-					config->background_color = color.pixel;
-				}
-			}
-
-			// Read font
-			if (XrmGetResource(db, "OpenBar.font", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar.font", "String", &type, &value) == True ||
-				XrmGetResource(db, "OpenBar*font", "String", &type, &value) == True ||
-				XrmGetResource(db, "openbar*font", "String", &type, &value) == True) {
-				config->font = strdup(value.addr);
-			}
-
-			XrmDestroyDatabase(db);
-		}
-	}
 }
 
 // Function to update the public IP address
@@ -282,7 +236,7 @@ void update_internal_ip(struct Config config) {
 			if (strcmp(ifa->ifa_name, config.interface) == 0 &&
 				ifa->ifa_addr != NULL &&
 				ifa->ifa_addr->sa_family == AF_INET) {
-				sa = (struct sockaddr_in *)ifa->ifa_addr;
+				sa = (struct sockaddr_in *) ifa->ifa_addr;
 				inet_ntop(AF_INET, &(sa->sin_addr), internal_ip, sizeof(internal_ip));
 				break;
 			}
@@ -337,8 +291,8 @@ unsigned long long update_mem() {
 	}
 
 	freemem =
-		(unsigned long long)uvm_stats.free *
-		(unsigned long long)uvm_stats.pagesize / (1024 * 1024);
+		(unsigned long long) uvm_stats.free *
+		(unsigned long long) uvm_stats.pagesize / (1024 * 1024);
 
 	return freemem;
 }
@@ -348,7 +302,7 @@ void update_cpu_base_speed() {
 	int temp = 0;
 	size_t templen = sizeof(temp);
 
-	int mib[2] = {CTL_HW, HW_CPUSPEED};
+	int mib[2] = { CTL_HW, HW_CPUSPEED };
 
 	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1)
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "no_freq");
@@ -360,7 +314,7 @@ void update_cpu_base_speed() {
 void update_cpu_avg_speed() {
 	uint64_t freq = 0;
 	size_t len = sizeof(freq);
-	int mib[2] = {CTL_HW, HW_CPUSPEED};
+	int mib[2] = { CTL_HW, HW_CPUSPEED };
 
 	if (sysctl(mib, 2, &freq, &len, NULL, 0) == -1) {
 		perror("sysctl");
@@ -393,17 +347,17 @@ void update_cpu_temp() {
 
 	if (temp_mib == -1) {
 		for (temp_mib = 0; temp_mib < 20; temp_mib++) {
-			int mib[5] = {CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0};  // acpitz0.temp0 (x395)
+			int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };  // acpitz0.temp0 (x395)
 			if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1)
 				break;
 		}
 	}
 
 	if (temp_mib != -1) {
-		int mib[5] = {CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0};
+		int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
-			if (temp >= 0 && temp <= 100) {
+			if (temp >= 0 && temp <= 100) {  // hmmm could be more than 100?
 				snprintf(cpu_temp, sizeof(cpu_temp), "%d\302\260C", temp);
 				return;
 			}
@@ -501,14 +455,11 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
-	// Read Xresources
-	read_xresources(display, &config);
-
 	int screen = DefaultScreen(display);
 	unsigned long black = BlackPixel(display, screen);
 	unsigned long white = WhitePixel(display, screen);
-	unsigned long bg_color = config.background_color ? config.background_color : white;
-	unsigned long fg_color = config.foreground_color ? config.foreground_color : black;
+	unsigned long bg_color = (config.background_color == 1) ? black : white;
+	unsigned long fg_color = (config.background_color == 1) ? white : black;
 
 	// Get screen dimensions
 	int screen_width = DisplayWidth(display, screen);
@@ -519,7 +470,7 @@ int main(int argc, const char *argv[]) {
 
 	// Create window
 	Window window = XCreateSimpleWindow(display, RootWindow(display, screen), x, y, bar_width, bar_height, 1, fg_color, bg_color);
-	XStoreName(display, window, "OpenBar");
+	XStoreName(display, window, "Status Bar");
 
 	// Set window to be always on top and avoid being managed by the window manager
 	XSetWindowAttributes attrs;
@@ -531,7 +482,7 @@ int main(int argc, const char *argv[]) {
 	XSetForeground(display, gc, fg_color);
 
 	// Load font
-	XFontStruct *font_info = XLoadQueryFont(display, config.font ? config.font : "fixed");
+	XFontStruct *font_info = XLoadQueryFont(display, "fixed");
 	if (!font_info) {
 		fprintf(stderr, "Unable to load font\n");
 		return 1;
@@ -564,7 +515,7 @@ int main(int argc, const char *argv[]) {
 			strlcat(text_buffer, " ", sizeof(text_buffer));
 			total_text_width += XTextWidth(font_info, config.logo, strlen(config.logo)) + 5;  // Add spacing
 		}
-
+		
 		// Update and display hostname if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
