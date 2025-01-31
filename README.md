@@ -75,7 +75,7 @@ pkg_add curl
 All necessary tools are included in your OpenBSD base installation. To clone the repository and build the project, use the following commands:
 
 ```sh
-git clone https://github.com/daviduhden/openbar/
+git clone https://github.com/daviduhden/openbar.git
 ```
 ```sh
 cd openbar
