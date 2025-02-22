@@ -1,6 +1,6 @@
 # OpenBar
 
-`openbar` is a status bar written in C designed for `cwm` (or other X11 window managers) on (OpenBSD)[https://www.openbsd.org]. Any contribution is highly appreciated.
+`openbar` is a status bar written in C designed for `cwm` (or other X11 window managers) on [OpenBSD](https://www.openbsd.org). Any contribution is highly appreciated.
 
 > Currently, this project does not support other operating systems, nor does the maintainer have any intention of working on it.
 
