@@ -598,15 +598,6 @@ int main(int argc, const char *argv[]) {
 		XFlush(display);  // Flush the X11 buffer to update the window
 		usleep(2000000);  // Sleep for 2 seconds before the next update
 
-		// Free dynamically allocated memory
-		if (config.logo != NULL) {
-			free(config.logo);
-			config.logo = NULL;
-		}
-		if (config.interface != NULL) {
-			free(config.interface);
-			config.interface = NULL;
-		}
 	}
 
 	// Close the X11 display
