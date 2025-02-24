@@ -54,6 +54,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "openbar.h"
 

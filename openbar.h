@@ -37,6 +37,11 @@
 #define MAX_OUTPUT_LENGTH 16
 #define HOSTNAME_MAX_LENGTH 256
 
+// Define IFF_UP if not defined
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
+
 // Global variables for storing various system information
 static char battery_percent[32];
 static char cpu_temp[32];
@@ -68,25 +73,68 @@ struct Config {
 };
 
 // Function declarations
+
+// Extracts the logo from a configuration line
 char *extract_logo(const char *line);
+
+// Reads configuration settings from a file
 struct Config config_file();
+
+// Updates the public IP address
 void update_public_ip();
+
+// Retrieves the hostname of the machine
 char *get_hostname();
+
+// Updates the internal IP address of the specified network interface
 void update_internal_ip(struct Config config);
+
+// Updates the VPN status
 void update_vpn();
+
+// Retrieves the amount of free memory in the system
 unsigned long long update_mem();
+
+// Retrieves the base speed of the CPU
 void update_cpu_base_speed();
+
+// Retrieves the average speed of the CPU
 void update_cpu_avg_speed();
+
+// Retrieves the system load averages for the past 1, 5, and 15 minutes
 void update_system_load(double load_avg[3]);
+
+// Retrieves the temperature of the CPU
 void update_cpu_temp();
+
+// Retrieves the battery status and percentage
 void update_battery();
+
+// Retrieves the current date and time
 void update_datetime();
+
+// Retrieves the ID of the currently focused window
 void update_windowid(char *window_id);
+
+// Calculates the width of the given text
 int calculate_text_width(Display *display, GC gc, const char *text);
+
+// Draws the text truncated to fit within the specified maximum width
 void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Draws the text, truncating it if necessary to fit within the specified maximum width
 void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Calculates the total width of the text tokens separated by the '|' character
 int calculate_total_text_width(Display *display, GC gc, const char *text);
+
+// Draws the text tokens separated by the '|' character
 void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, const char *text);
+
+// Draws the text centered within the specified maximum width
 void draw_centered_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Declaration for the getloadavg function
+int getloadavg(double loadavg[], int nelem);
 
 #endif // OPENBAR_H
