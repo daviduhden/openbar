@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TERMBARC_H
-#define TERMBARC_H
+#ifndef OPENBAR_H
+#define OPENBAR_H
 
 // Definitions for various lengths and sizes used in the program
 #define INET_ADDRSTRLEN 16
@@ -51,4 +51,4 @@ char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
 
-#endif // TERMBARC_H
+#endif // OPENBAR_H
