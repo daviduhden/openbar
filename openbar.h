@@ -51,4 +51,42 @@ char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
 
+// Struct for configuration settings
+struct Config {
+	char *logo;
+	char *interface;
+	int show_hostname;
+	int show_date;
+	int show_cpu;
+	int show_mem;
+	int show_bat;
+	int show_load;
+	int show_winid;
+	int show_net;
+	int show_vpn;
+	int background_color;
+};
+
+// Function declarations
+char *extract_logo(const char *line);
+struct Config config_file();
+void update_public_ip();
+char *get_hostname();
+void update_internal_ip(struct Config config);
+void update_vpn();
+unsigned long long update_mem();
+void update_cpu_base_speed();
+void update_cpu_avg_speed();
+void update_system_load(double load_avg[3]);
+void update_cpu_temp();
+void update_battery();
+void update_datetime();
+void update_windowid(char *window_id);
+int calculate_text_width(Display *display, GC gc, const char *text);
+void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+int calculate_total_text_width(Display *display, GC gc, const char *text);
+void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, const char *text);
+void draw_centered_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
 #endif // OPENBAR_H
