@@ -358,7 +358,7 @@ void update_cpu_temp() {
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
 			if (temp >= 0 && temp <= 100) {
-				snprintf(cpu_temp, sizeof(cpu_temp), "%d%cC", temp, 248);
+				snprintf(cpu_temp, sizeof(cpu_temp), u8"%d\u00B0C", temp);
 				return;
 			}
 		}
