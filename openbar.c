@@ -75,6 +75,8 @@ struct Config {
 };
 
 // Function to extract the logo from a configuration line
+// This function searches for the "logo=" keyword in the line and extracts
+// the logo string.
 char *extract_logo(const char *line) {
 	if (strstr(line, "logo=")) {
 		const char *logo_start = strchr(line, '=') + 1;
@@ -104,6 +106,8 @@ char *extract_logo(const char *line) {
 }
 
 // Function to read configuration settings from a file
+// This function reads the configuration file and populates the Config
+// struct with the settings.
 struct Config config_file() {
 	struct Config config = {
 		.logo = NULL,
@@ -202,6 +206,8 @@ struct Config config_file() {
 }
 
 // Function to update the public IP address
+// This function uses the curl command to fetch the public IP address and
+// stores it in the global variable.
 void update_public_ip() {
 	FILE *fp;
 	char buffer[32];
@@ -223,6 +229,8 @@ void update_public_ip() {
 }
 
 // Function to get the hostname of the machine
+// This function retrieves the hostname of the machine using the gethostname
+// system call.
 char *get_hostname() {
 	static char hostname[HOSTNAME_MAX_LENGTH];
 
@@ -235,6 +243,8 @@ char *get_hostname() {
 }
 
 // Function to update the internal IP address
+// This function retrieves the internal IP address of the specified network
+// interface.
 void update_internal_ip(struct Config config) {
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in *sa;
@@ -267,6 +277,8 @@ void update_internal_ip(struct Config config) {
 }
 
 // Function to update VPN status
+// This function checks for the presence of WireGuard (wg) interfaces to
+// determine VPN status.
 void update_vpn() {
 	struct ifaddrs *ifap, *ifa;
 	int has_wg_interface = 0;
@@ -293,6 +305,7 @@ void update_vpn() {
 }
 
 // Function to update memory usage
+// This function retrieves the amount of free memory in the system.
 unsigned long long update_mem() {
 	int mib[2];
 	size_t len;
@@ -318,6 +331,7 @@ unsigned long long update_mem() {
 }
 
 // Function to update the CPU base speed
+// This function retrieves the base speed of the CPU.
 void update_cpu_base_speed() {
 	int temp = 0;
 	size_t templen = sizeof(temp);
@@ -332,6 +346,7 @@ void update_cpu_base_speed() {
 }
 
 // Function to update the average CPU speed
+// This function retrieves the average speed of the CPU.
 void update_cpu_avg_speed() {
 	uint64_t freq = 0;
 	size_t len = sizeof(freq);
@@ -346,6 +361,8 @@ void update_cpu_avg_speed() {
 }
 
 // Function to update the system load
+// This function retrieves the system load averages for the past 1, 5, and
+// 15 minutes.
 void update_system_load(double load_avg[3]) {
 	double load[3];
 
@@ -360,6 +377,7 @@ void update_system_load(double load_avg[3]) {
 }
 
 // Function to update the CPU temperature
+// This function retrieves the temperature of the CPU.
 void update_cpu_temp() {
 	struct sensor sensor;
 	size_t templen = sizeof(sensor);
@@ -394,6 +412,7 @@ void update_cpu_temp() {
 }
 
 // Function to update battery status
+// This function retrieves the battery status and percentage.
 void update_battery() {
 	int fd;
 	struct apm_power_info pi;
@@ -423,6 +442,7 @@ void update_battery() {
 }
 
 // Function to update date and time
+// This function retrieves the current date and time.
 void update_datetime() {
 	time_t rawtime;
 	struct tm *timeinfo;
@@ -432,6 +452,7 @@ void update_datetime() {
 }
 
 // Function to update the window ID
+// This function retrieves the ID of the currently focused window.
 void update_windowid(char *window_id) {
 	const char *command =
 		"xprop -root 32c '\\t$0' _NET_CURRENT_DESKTOP | cut -f 2";
@@ -461,11 +482,16 @@ void update_windowid(char *window_id) {
 }
 
 // Function to draw text on the X11 window
+// This function calculates the width of the given text.
 int calculate_text_width(Display *display, GC gc, const char *text) {
 	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
 }
 
-void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+// Function to draw truncated text on the X11 window
+// This function draws the text truncated to fit within the specified
+// maximum width.
+void draw_truncated_text(Display *display, Window window, GC gc, int x,
+	int y, const char *text, int max_width) {
 	int len = strlen(text);
 	int text_width = calculate_text_width(display, gc, text);
 	while (text_width > max_width && len > 0) {
@@ -478,7 +504,11 @@ void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, c
 	XDrawString(display, window, gc, x, y, truncated_text, len);
 }
 
-void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+// Function to draw text on the X11 window
+// This function draws the text, truncating it if necessary to fit within
+// the specified maximum width.
+void draw_text(Display *display, Window window, GC gc, int x, int y,
+	const char *text, int max_width) {
 	int text_width = calculate_text_width(display, gc, text);
 	if (text_width > max_width) {
 		draw_truncated_text(display, window, gc, x, y, text, max_width);
@@ -487,6 +517,9 @@ void draw_text(Display *display, Window window, GC gc, int x, int y, const char 
 	}
 }
 
+// Function to calculate the total width of text tokens
+// This function calculates the total width of the text tokens separated
+// by the '|' character.
 int calculate_total_text_width(Display *display, GC gc, const char *text) {
 	char buffer[1024];
 	strncpy(buffer, text, sizeof(buffer));
@@ -502,7 +535,10 @@ int calculate_total_text_width(Display *display, GC gc, const char *text) {
 	return total_text_width;
 }
 
-void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, const char *text) {
+// Function to draw text tokens on the X11 window
+// This function draws the text tokens separated by the '|' character.
+void draw_text_tokens(Display *display, Window window, GC gc, int x, int y,
+	const char *text) {
 	char buffer[1024];
 	strncpy(buffer, text, sizeof(buffer));
 	buffer[sizeof(buffer) - 1] = '\0';
@@ -516,12 +552,19 @@ void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, cons
 	}
 }
 
-void draw_centered_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+// Function to draw centered text on the X11 window
+// This function draws the text centered within the specified maximum
+// width.
+void draw_centered_text(Display *display, Window window, GC gc, int x,
+	int y, const char *text, int max_width) {
 	int total_text_width = calculate_total_text_width(display, gc, text);
 	int text_x = (max_width - total_text_width) / 2;
 	draw_text_tokens(display, window, gc, text_x, y, text);
 }
 
+// Main function
+// This function initializes the X11 display, reads the configuration file,
+// and enters the main event loop to update and draw the status bar.
 int main(int argc, const char *argv[]) {
 	// Set locale for UTF-8
 	setlocale(LC_CTYPE, "C");
