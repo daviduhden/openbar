@@ -89,9 +89,9 @@ char *extract_logo(const char *line) {
 		size_t logo_length = logo_end - logo_start;
 
 		// Allocate memory for the logo and copy it
-		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
+		char *logo = (char *) malloc((logo_length + 1) * sizeof(*logo));
 		if (logo == NULL) {
-			perror("No logo.");
+			perror("Failed to allocate memory for logo");
 			exit(EXIT_FAILURE);
 		}
 		strncpy(logo, logo_start, logo_length);
@@ -103,7 +103,20 @@ char *extract_logo(const char *line) {
 
 // Function to read configuration settings from a file
 struct Config config_file() {
-	struct Config config = { NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
+	struct Config config = {
+		.logo = NULL,
+		.interface = NULL,
+		.show_hostname = 0,
+		.show_date = 0,
+		.show_cpu = 0,
+		.show_mem = 0,
+		.show_bat = 0,
+		.show_load = 0,
+		.show_winid = 0,
+		.show_net = 0,
+		.show_vpn = 0,
+		.background_color = 0
+	};
 	const char *home_dir = getenv("HOME");
 	if (home_dir == NULL) {
 		fprintf(stderr, "Error: HOME environment variable not set\n");
@@ -133,6 +146,7 @@ struct Config config_file() {
 		}
 	}
 
+	#define MAX_LINE_LENGTH 256
 	char line[MAX_LINE_LENGTH];
 
 	while (fgets(line, sizeof(line), file)) {
@@ -147,9 +161,9 @@ struct Config config_file() {
 		if (strstr(line, "interface=")) {
 			const char *interface_start = strchr(line, '=') + 1;
 			size_t interface_length = strlen(interface_start);
-			config.interface = malloc(interface_length + 1);
+			config.interface = malloc((interface_length + 1) * sizeof(*config.interface));
 			if (config.interface == NULL) {
-				perror("No if.");
+				perror("Failed to allocate memory for interface");
 				exit(EXIT_FAILURE);
 			}
 			strncpy(config.interface, interface_start, interface_length);
@@ -193,17 +207,17 @@ void update_public_ip() {
 	// Using curl to get the public IP address
 	fp = popen("curl -s ifconfig.me", "r");
 	if (fp == NULL) {
-		perror("popen");
+		perror("Failed to open pipe for curl command");
 		exit(EXIT_FAILURE);
+	} else {
+		if (fgets(buffer, sizeof(buffer), fp) != NULL) {
+			// Copy the public IP address to the global variable
+			strncpy(public_ip, buffer, MAX_IP_LENGTH);
+			// Remove trailing newline character, if any
+			public_ip[strcspn(public_ip, "\n")] = '\0';
+		}
+		pclose(fp);
 	}
-
-	if (fgets(buffer, sizeof(buffer), fp) != NULL) {
-		// Copy the public IP address to the global variable
-		strncpy(public_ip, buffer, MAX_IP_LENGTH);
-		// Remove trailing newline character, if any
-		public_ip[strcspn(public_ip, "\n")] = '\0';
-	}
-	pclose(fp);
 }
 
 // Function to get the hostname of the machine
@@ -229,20 +243,24 @@ void update_internal_ip(struct Config config) {
 	}
 	// Search for the specified interface or fallback to lo0
 	if (config.interface == NULL || strlen(config.interface) == 0) {
-		strlcpy(internal_ip, "lo0", sizeof(internal_ip));
+		strlcpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
 	} else {
 		// Search for the specified interface
+		bool found = false;
 		for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
 			if (strcmp(ifa->ifa_name, config.interface) == 0 &&
 				ifa->ifa_addr != NULL &&
 				ifa->ifa_addr->sa_family == AF_INET) {
 				sa = (struct sockaddr_in *) ifa->ifa_addr;
 				inet_ntop(AF_INET, &(sa->sin_addr), internal_ip, sizeof(internal_ip));
+				found = true;
 				break;
 			}
 		}
+		if (!found) {
+			strlcpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
+		}
 	}
-
 	freeifaddrs(ifap);
 }
 
@@ -253,7 +271,7 @@ void update_vpn() {
 
 	if (getifaddrs(&ifap) == -1) {
 		perror("getifaddrs");
-		exit(EXIT_FAILURE);
+		return;
 	}
 	// Check for wgX interfaces
 	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
@@ -286,13 +304,13 @@ unsigned long long update_mem() {
 	struct uvmexp uvm_stats;
 
 	if (sysctl(mib, 2, &uvm_stats, &len, NULL, 0) == -1) {
-		perror("sysctl");
+		perror("Failed to get memory statistics");
 		exit(EXIT_FAILURE);
+	} else {
+		freemem =
+			(unsigned long long) uvm_stats.free *
+			(unsigned long long) uvm_stats.pagesize / (1024 * 1024);
 	}
-
-	freemem =
-		(unsigned long long) uvm_stats.free *
-		(unsigned long long) uvm_stats.pagesize / (1024 * 1024);
 
 	return freemem;
 }
@@ -304,10 +322,11 @@ void update_cpu_base_speed() {
 
 	int mib[2] = { CTL_HW, HW_CPUSPEED };
 
-	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1)
+	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1) {
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "no_freq");
-	else
+	} else {
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMHz", temp);
+	}
 }
 
 // Function to update the average CPU speed
@@ -319,21 +338,22 @@ void update_cpu_avg_speed() {
 	if (sysctl(mib, 2, &freq, &len, NULL, 0) == -1) {
 		perror("sysctl");
 		return;
+	} else {
+		snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMHz", freq);
 	}
-	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMHz", freq);
 }
 
 // Function to update the system load
-void update_system_load(double *load_avg) {
-	double load[3];  // Take 1, 5, and 15-minute load averages
+void update_system_load(double load_avg[3]) {
+	double load[3];
 
 	if (getloadavg(load, 3) == -1) {
 		perror("getloadavg");
 		exit(EXIT_FAILURE);
-	}
-
-	for (int i = 0; i < 3; i++) {
-		load_avg[i] = load[i];
+	} else {
+		for (int i = 0; i < 3; i++) {
+			load_avg[i] = load[i];
+		}
 	}
 }
 
@@ -355,12 +375,15 @@ void update_cpu_temp() {
 
 	if (temp_mib != -1) {
 		int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };
-		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
-			temp = (sensor.value - 273150000) / 1000000.0;
-			if (temp >= 0 && temp <= 100) {
-				snprintf(cpu_temp, sizeof(cpu_temp), "%dC", temp);
-				return;
-			}
+		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) == -1) {
+			perror("sysctl");
+			snprintf(cpu_temp, sizeof(cpu_temp), "x");
+			return;
+		}
+		temp = (sensor.value - 273150000) / 1000000.0;
+		if (temp >= 0 && temp <= 100) {
+			snprintf(cpu_temp, sizeof(cpu_temp), "%d ºC", temp);
+			return;
 		}
 	}
 	// If no valid temperature reading found, set to "x"
@@ -373,8 +396,18 @@ void update_battery() {
 	int fd;
 	struct apm_power_info pi;
 
-	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
-		ioctl(fd, APM_IOC_GETPOWER, &pi) == -1 || close(fd) == -1) {
+	if ((fd = open("/dev/apm", O_RDONLY)) == -1) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
+
+	if (ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
+		close(fd);
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
+
+	if (close(fd) == -1) {
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
@@ -384,7 +417,6 @@ void update_battery() {
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
-
 	snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
 }
 
@@ -404,46 +436,88 @@ void update_windowid(char *window_id) {
 
 	FILE *pipe = popen(command, "r");
 	if (pipe == NULL) {
-		fprintf(stderr, "Error: Failed to open pipe for command execution");
+		fprintf(stderr, "Error: Failed to open pipe for xprop command");
 		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		return;
 	}
 
 	char output[MAX_OUTPUT_LENGTH];
 	if (fgets(output, MAX_OUTPUT_LENGTH, pipe) == NULL) {
-		fprintf(stderr, "Error: Failed to read command output");
+		fprintf(stderr, "Error: Failed to read xprop command output");
 		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		pclose(pipe);
 		return;
+	} else {
+		size_t len = strlen(output);
+		if (len > 0 && output[len - 1] == '\n') {
+			output[len - 1] = '\0';
+		}
+		strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
 	}
 
 	pclose(pipe);
-
-	size_t len = strlen(output);
-	if (len > 0 && output[len - 1] == '\n') {
-		output[len - 1] = '\0';
-	}
-
-	strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
 }
 
 // Function to draw text on the X11 window
+int calculate_text_width(Display *display, GC gc, const char *text) {
+	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
+}
+
+void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+	int len = strlen(text);
+	int text_width = calculate_text_width(display, gc, text);
+	while (text_width > max_width && len > 0) {
+		len--;
+		text_width = calculate_text_width(display, gc, text);
+	}
+	char truncated_text[len + 1];
+	strncpy(truncated_text, text, len);
+	truncated_text[len] = '\0';
+	XDrawString(display, window, gc, x, y, truncated_text, len);
+}
+
 void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
-	int text_width = XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
+	int text_width = calculate_text_width(display, gc, text);
 	if (text_width > max_width) {
-		// Truncate the text to fit within the max_width
-		int len = strlen(text);
-		while (text_width > max_width && len > 0) {
-			len--;
-			text_width = XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, len);
-		}
-		char truncated_text[len + 1];
-		strncpy(truncated_text, text, len);
-		truncated_text[len] = '\0';
-		XDrawString(display, window, gc, x, y, truncated_text, len);
+		draw_truncated_text(display, window, gc, x, y, text, max_width);
 	} else {
 		XDrawString(display, window, gc, x, y, text, strlen(text));
 	}
+}
+
+int calculate_total_text_width(Display *display, GC gc, const char *text) {
+	char buffer[1024];
+	strncpy(buffer, text, sizeof(buffer));
+	buffer[sizeof(buffer) - 1] = '\0';
+
+	char *saveptr;
+	char *token = strtok_r(buffer, "|", &saveptr);
+	int total_text_width = 0;
+	while (token != NULL) {
+		total_text_width += XTextWidth(XQueryFont(display, XGContextFromGC(gc)), token, strlen(token)) + 5;
+		token = strtok_r(NULL, "|", &saveptr);
+	}
+	return total_text_width;
+}
+
+void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, const char *text) {
+	char buffer[1024];
+	strncpy(buffer, text, sizeof(buffer));
+	buffer[sizeof(buffer) - 1] = '\0';
+
+	char *saveptr;
+	char *token = strtok_r(buffer, "|", &saveptr);
+	while (token != NULL) {
+		XDrawString(display, window, gc, x, y, token, strlen(token));
+		x += XTextWidth(XQueryFont(display, XGContextFromGC(gc)), token, strlen(token)) + 5;
+		token = strtok_r(NULL, "|", &saveptr);
+	}
+}
+
+void draw_centered_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+	int total_text_width = calculate_total_text_width(display, gc, text);
+	int text_x = (max_width - total_text_width) / 2;
+	draw_text_tokens(display, window, gc, text_x, y, text);
 }
 
 int main(int argc, const char *argv[]) {
@@ -493,8 +567,8 @@ int main(int argc, const char *argv[]) {
 
 	// Load non-Unicode font
 	XFontStruct *font_info = XLoadQueryFont(display, "fixed");
-	if (!font_info) {
-		fprintf(stderr, "Unable to load font\n");
+	if (font_info == NULL) {
+		fprintf(stderr, "Failed to load X11 font\n");
 		return 1;
 	}
 	XSetFont(display, gc, font_info->fid);
@@ -506,43 +580,34 @@ int main(int argc, const char *argv[]) {
 	while (1) {
 		XClearWindow(display, window);
 
-		// Calculate the total width of the text
-		int total_text_width = 0;
+		// Collect and calculate width of each part of the text
 		char text_buffer[1024];
 		text_buffer[0] = '\0';
 
-		// Collect and calculate width of each part of the text
+		// Collect and concatenate text parts with separators
 		if (config.show_winid) {
 			update_windowid(window_id);
 			strlcat(text_buffer, window_id, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, window_id, strlen(window_id)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Display logo if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			strlcat(text_buffer, config.logo, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, config.logo, strlen(config.logo)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
-		
-		// Update and display hostname if enabled
+
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
 			strlcat(text_buffer, hostname, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, hostname, strlen(hostname)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display date/time if enabled
 		if (config.show_date) {
 			update_datetime();
 			strlcat(text_buffer, datetime, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, datetime, strlen(datetime)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display CPU information if enabled
 		if (config.show_cpu) {
 			update_cpu_temp();
 			update_cpu_avg_speed();
@@ -550,64 +615,53 @@ int main(int argc, const char *argv[]) {
 			char cpu_info[MAX_OUTPUT_LENGTH * 2];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
 			strlcat(text_buffer, cpu_info, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, cpu_info, strlen(cpu_info)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display memory usage if enabled
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
 			strlcat(text_buffer, mem_info, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, mem_info, strlen(mem_info)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display system load if enabled
 		if (config.show_load) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
 			strlcat(text_buffer, load_info, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, load_info, strlen(load_info)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display battery status if enabled
 		if (config.show_bat) {
 			update_battery();
 			strlcat(text_buffer, battery_percent, sizeof(text_buffer));
-			strlcat(text_buffer, " ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, battery_percent, strlen(battery_percent)) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display VPN status if enabled
 		if (config.show_vpn) {
 			update_vpn();
 			strlcat(text_buffer, "VPN ", sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, "VPN", strlen("VPN")) + 5;  // Add spacing
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
-		// Update and display network information if enabled
 		if (config.show_net) {
 			update_public_ip();
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
 			strlcat(text_buffer, net_info, sizeof(text_buffer));
-			total_text_width += XTextWidth(font_info, net_info, strlen(net_info));
 		}
 
 		// Center the text horizontally
-		int text_x = (bar_width - total_text_width) / 2;
 		const int text_y = 15;  // Y position for text, adjusted for smaller height
 
-		// Draw the centered text
-		draw_text(display, window, gc, text_x, text_y, text_buffer, bar_width);
+		// Draw the centered text with separators
+		draw_centered_text(display, window, gc, 0, text_y, text_buffer, bar_width);
 
 		XFlush(display);  // Flush the X11 buffer to update the window
-		usleep(2000000);  // Sleep for 2 seconds before the next update
-
+		struct timespec req = {2, 0};  // 2 seconds, 0 nanoseconds
+		nanosleep(&req, NULL);  // Sleep for 2 seconds before the next update
 	}
 
 	// Close the X11 display
