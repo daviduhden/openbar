@@ -191,7 +191,7 @@ void update_public_ip() {
 	char buffer[32];
 
 	// Using curl to get the public IP address
-	fp = popen("/usr/local/bin/curl -s ifconfig.me", "r");
+	fp = popen("curl -s ifconfig.me", "r");
 	if (fp == NULL) {
 		perror("popen");
 		exit(EXIT_FAILURE);
@@ -307,7 +307,7 @@ void update_cpu_base_speed() {
 	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1)
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "no_freq");
 	else
-		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMhz", temp);
+		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMHz", temp);
 }
 
 // Function to update the average CPU speed
@@ -320,7 +320,7 @@ void update_cpu_avg_speed() {
 		perror("sysctl");
 		return;
 	}
-	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
+	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMHz", freq);
 }
 
 // Function to update the system load
@@ -358,7 +358,7 @@ void update_cpu_temp() {
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
 			if (temp >= 0 && temp <= 100) {
-				snprintf(cpu_temp, sizeof(cpu_temp), "%d\302\260C", temp);
+				snprintf(cpu_temp, sizeof(cpu_temp), "%d°C", temp);
 				return;
 			}
 		}
@@ -385,11 +385,7 @@ void update_battery() {
 		return;
 	}
 
-	if (pi.ac_state == APM_AC_ON) {
-		snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
-	} else {
-		snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
-	}
+	snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
 }
 
 // Function to update date and time
