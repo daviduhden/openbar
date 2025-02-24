@@ -70,4 +70,15 @@ uninstall:
 debug: build
 	@echo "Starting debugger for ${TARGET}..."
 	@egdb -q ./${TARGET} -ex "break main" -ex "run"
-	
+
+# Help target to display available commands
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all        - Build the project with debugging flags"
+	@echo "  build      - Build the project with debugging flags"
+	@echo "  opt        - Build the project with optimization flags"
+	@echo "  install    - Install the executable, config, and man pages"
+	@echo "  clean      - Remove build artifacts"
+	@echo "  uninstall  - Remove the installed files"
+	@echo "  debug      - Run the program in a debugger"
