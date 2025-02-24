@@ -3,7 +3,7 @@ CC ?= cc
 LIBS = -L/usr/X11R6/lib -lX11
 OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
-CFLAGS = -pipe -Wall -Werror -march=native
+CFLAGS = -pipe -Wall -Werror -march=native -std=c11
 INCLUDEDIR = -I/usr/X11R6/include -I.
 
 # Targets
