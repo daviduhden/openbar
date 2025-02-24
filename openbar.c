@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
 #include <unistd.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
@@ -44,11 +43,9 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-
 #include <sys/sysctl.h>
 #include <sys/sensors.h>
 #include <machine/apmvar.h>
-
 #include <wchar.h>
 #include <time.h>
 #include <locale.h>
