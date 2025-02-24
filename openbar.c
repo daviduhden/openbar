@@ -358,7 +358,7 @@ void update_cpu_temp() {
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
 			if (temp >= 0 && temp <= 100) {
-				snprintf(cpu_temp, sizeof(cpu_temp), "%d°C", temp);
+				snprintf(cpu_temp, sizeof(cpu_temp), "%d%cC", temp, 248);
 				return;
 			}
 		}
@@ -491,10 +491,10 @@ int main(int argc, const char *argv[]) {
 	GC gc = XCreateGC(display, window, 0, NULL);
 	XSetForeground(display, gc, fg_color);
 
-	// Load Unicode font
-	XFontStruct *font_info = XLoadQueryFont(display, "-misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1");
+	// Load non-Unicode font
+	XFontStruct *font_info = XLoadQueryFont(display, "fixed");
 	if (!font_info) {
-		fprintf(stderr, "Unable to load Unicode font\n");
+		fprintf(stderr, "Unable to load font\n");
 		return 1;
 	}
 	XSetFont(display, gc, font_info->fid);
