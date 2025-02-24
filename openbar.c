@@ -428,8 +428,22 @@ void update_windowid(char *window_id) {
 }
 
 // Function to draw text on the X11 window
-void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text) {
-	XDrawString(display, window, gc, x, y, text, strlen(text));
+void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+	int text_width = XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
+	if (text_width > max_width) {
+		// Truncate the text to fit within the max_width
+		int len = strlen(text);
+		while (text_width > max_width && len > 0) {
+			len--;
+			text_width = XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, len);
+		}
+		char truncated_text[len + 1];
+		strncpy(truncated_text, text, len);
+		truncated_text[len] = '\0';
+		XDrawString(display, window, gc, x, y, truncated_text, len);
+	} else {
+		XDrawString(display, window, gc, x, y, text, strlen(text));
+	}
 }
 
 int main(int argc, const char *argv[]) {
@@ -589,7 +603,7 @@ int main(int argc, const char *argv[]) {
 		const int text_y = 15;  // Y position for text, adjusted for smaller height
 
 		// Draw the centered text
-		draw_text(display, window, gc, text_x, text_y, text_buffer);
+		draw_text(display, window, gc, text_x, text_y, text_buffer, bar_width);
 
 		XFlush(display);  // Flush the X11 buffer to update the window
 		usleep(2000000);  // Sleep for 2 seconds before the next update
