@@ -53,7 +53,6 @@
 #include <X11/Xutil.h>
 #include <sys/types.h>
 #include <sys/param.h>
-#include <bsd/string.h>
 #include <stdlib.h>
 
 #include "openbar.h"
@@ -238,7 +237,7 @@ void update_internal_ip(struct Config config) {
 	}
 	// Search for the specified interface or fallback to lo0
 	if (config.interface == NULL || strlen(config.interface) == 0) {
-		strlcpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
+		strncpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
 	} else {
 		// Search for the specified interface
 		bool found = false;
@@ -253,7 +252,7 @@ void update_internal_ip(struct Config config) {
 			}
 		}
 		if (!found) {
-			strlcpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
+			strncpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
 		}
 	}
 	freeifaddrs(ifap);
@@ -296,8 +295,6 @@ unsigned long long update_mem() {
 
 	mib[0] = CTL_VM;
 	mib[1] = VM_UVMEXP;
-
-	len = sizeof(struct uvmexp);
 
 	struct uvmexp uvm_stats;
 
@@ -401,24 +398,24 @@ void update_battery() {
 	struct apm_power_info pi;
 
 	if ((fd = open("/dev/apm", O_RDONLY)) == -1) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
 		close(fd);
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (close(fd) == -1) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (pi.battery_state == APM_BATT_UNKNOWN ||
 		pi.battery_state == APM_BATTERY_ABSENT) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 	snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
@@ -443,14 +440,14 @@ void update_windowid(char *window_id) {
 	FILE *pipe = popen(command, "r");
 	if (pipe == NULL) {
 		fprintf(stderr, "Error: Failed to open pipe for xprop command");
-		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
+		strncpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		return;
 	}
 
 	char output[MAX_OUTPUT_LENGTH];
 	if (fgets(output, MAX_OUTPUT_LENGTH, pipe) == NULL) {
 		fprintf(stderr, "Error: Failed to read xprop command output");
-		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
+		strncpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		pclose(pipe);
 		return;
 	} else {
@@ -458,7 +455,7 @@ void update_windowid(char *window_id) {
 		if (len > 0 && output[len - 1] == '\n') {
 			output[len - 1] = '\0';
 		}
-		strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
+		strncpy(window_id, output, MAX_OUTPUT_LENGTH);
 	}
 
 	pclose(pipe);
@@ -615,25 +612,25 @@ int main(int argc, const char *argv[]) {
 		// Collect and concatenate text parts with separators
 		if (config.show_winid) {
 			update_windowid(window_id);
-			strlcat(text_buffer, window_id, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, window_id, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.logo != NULL && strlen(config.logo) > 0) {
-			strlcat(text_buffer, config.logo, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, config.logo, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
-			strlcat(text_buffer, hostname, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, hostname, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_date) {
 			update_datetime();
-			strlcat(text_buffer, datetime, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, datetime, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_cpu) {
@@ -642,35 +639,35 @@ int main(int argc, const char *argv[]) {
 			update_cpu_base_speed();
 			char cpu_info[MAX_OUTPUT_LENGTH * 2];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
-			strlcat(text_buffer, cpu_info, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, cpu_info, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
-			strlcat(text_buffer, mem_info, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, mem_info, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_load) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
-			strlcat(text_buffer, load_info, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, load_info, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_bat) {
 			update_battery();
-			strlcat(text_buffer, battery_percent, sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, battery_percent, sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_vpn) {
 			update_vpn();
-			strlcat(text_buffer, "VPN ", sizeof(text_buffer));
-			strlcat(text_buffer, " | ", sizeof(text_buffer));
+			strncpy(text_buffer, "VPN ", sizeof(text_buffer));
+			strncpy(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_net) {
@@ -678,7 +675,7 @@ int main(int argc, const char *argv[]) {
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
-			strlcat(text_buffer, net_info, sizeof(text_buffer));
+			strncpy(text_buffer, net_info, sizeof(text_buffer));
 		}
 
 		// Center the text horizontally
