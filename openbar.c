@@ -547,7 +547,7 @@ int main(int argc, const char *argv[]) {
 			update_cpu_temp();
 			update_cpu_avg_speed();
 			update_cpu_base_speed();
-			char cpu_info[MAX_OUTPUT_LENGTH];
+			char cpu_info[MAX_OUTPUT_LENGTH * 2];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
 			strlcat(text_buffer, cpu_info, sizeof(text_buffer));
 			strlcat(text_buffer, " ", sizeof(text_buffer));
