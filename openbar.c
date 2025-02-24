@@ -149,7 +149,6 @@ struct Config config_file() {
 		}
 	}
 
-	#define MAX_LINE_LENGTH 256
 	char line[MAX_LINE_LENGTH];
 
 	while (fgets(line, sizeof(line), file)) {
