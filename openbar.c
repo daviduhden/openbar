@@ -55,22 +55,6 @@
 
 #include "openbar.h"
 
-// Struct for configuration settings
-struct Config {
-	char *logo;
-	char *interface;
-	int show_hostname;
-	int show_date;
-	int show_cpu;
-	int show_mem;
-	int show_bat;
-	int show_load;
-	int show_winid;
-	int show_net;
-	int show_vpn;
-	int background_color;
-};
-
 // Function to extract the logo from a configuration line
 // This function searches for the "logo=" keyword in the line and extracts
 // the logo string.
