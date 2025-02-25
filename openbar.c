@@ -39,7 +39,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/sysctl.h>
@@ -56,7 +55,120 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "openbar.h"
+// Definitions for various lengths and sizes used in the program
+#define SLEEP_DURATION 2  // Sleep duration in seconds
+#define INET_ADDRSTRLEN 16
+#define MAX_IP_LENGTH 32
+#define MAX_LINE_LENGTH 256
+#define MAX_OUTPUT_LENGTH 16
+#define HOSTNAME_MAX_LENGTH 256
+
+// Define color values for readability
+#define BLACK_COLOR 0x000000
+#define WHITE_COLOR 0xFFFFFF
+
+// Define IFF_UP if not defined
+#ifndef IFF_UP
+#define IFF_UP 0x1
+#endif
+
+// Global variables for storing various system information
+static char battery_percent[32];
+static char cpu_temp[32];
+static char cpu_base_speed[32];
+static char cpu_avg_speed[32];
+static char datetime[32];
+static char public_ip[MAX_IP_LENGTH];
+static char internal_ip[INET_ADDRSTRLEN];
+char vpn_status[16];
+static char mem_info[32];
+static char window_id[MAX_OUTPUT_LENGTH];
+double system_load[3];
+unsigned long long free_memory;
+
+// Struct for configuration settings
+struct Config {
+	char *logo_path;
+	char *interface;
+	int show_hostname;
+	int show_date;
+	int show_cpu;
+	int show_mem;
+	int show_bat;
+	int show_load;
+	int show_winid;
+	int show_net;
+	int show_vpn;
+	int background_color;
+};
+
+// Function declarations
+
+// Extracts the logo from a configuration line
+char *extract_logo(const char *line);
+
+// Reads configuration settings from a file
+struct Config read_config_file();
+
+// Updates the public IP address
+void update_public_ip();
+
+// Retrieves the hostname of the machine
+char *get_hostname();
+
+// Updates the internal IP address of the specified network interface
+void update_internal_ip(struct Config config);
+
+// Updates the VPN status
+void update_vpn();
+
+// Retrieves the amount of free memory in the system
+unsigned long long update_mem();
+
+// Retrieves the base speed of the CPU
+void update_cpu_base_speed();
+
+// Retrieves the average speed of the CPU
+void update_cpu_avg_speed();
+
+// Retrieves the system load averages for the past 1, 5, and 15 minutes
+void update_system_load(double load_avg[3]);
+
+// Retrieves the temperature of the CPU
+void update_cpu_temp();
+
+// Retrieves the battery status and percentage
+void update_battery();
+
+// Retrieves the current date and time
+void update_datetime();
+
+// Retrieves the ID of the currently focused window
+void update_windowid(char *window_id);
+
+// Calculates the width of the given text
+int calculate_text_width(Display *display, GC gc, const char *text);
+
+// Draws the text truncated to fit within the specified maximum width
+void draw_truncated_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Draws the text, truncating it if necessary to fit within the specified maximum width
+void draw_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Calculates the total width of the text tokens separated by the '|' character
+int calculate_total_text_width(Display *display, GC gc, const char *text);
+
+// Draws the text tokens separated by the '|' character
+void draw_text_tokens(Display *display, Window window, GC gc, int x, int y, const char *text);
+
+// Draws the text centered within the specified maximum width
+void draw_centered_text(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width);
+
+// Declaration for the getloadavg function
+int getloadavg(double loadavg[], int nelem);
+
+// Forward declaration for the apm_power_info struct
+struct apm_power_info;
 
 // Function to extract the logo from a configuration line
 // This function searches for the "logo=" keyword in the line and extracts
@@ -77,14 +189,13 @@ char *extract_logo(const char *line) {
 		size_t logo_length = logo_end - logo_start;
 
 		// Allocate memory for the logo and copy it
-		char *logo = (char *) malloc((logo_length + 1) * sizeof(*logo));
-		if (logo == NULL) {
-			perror("Failed to allocate memory for logo");
+		char *logo_path = (char *) calloc((logo_length + 1), sizeof(*logo_path));
+		if (logo_path == NULL) {
+			perror("Failed to allocate memory for logo_path");
 			exit(EXIT_FAILURE);
 		}
-		strncpy(logo, logo_start, logo_length);
-		logo[logo_length] = '\0';
-		return logo;
+		strlcpy(logo_path, logo_start, logo_length + 1);
+		return logo_path;
 	}
 	return NULL;
 }
@@ -92,9 +203,9 @@ char *extract_logo(const char *line) {
 // Function to read configuration settings from a file
 // This function reads the configuration file and populates the Config
 // struct with the settings.
-struct Config config_file() {
+struct Config read_config_file() {
 	struct Config config = {
-		.logo = NULL,
+		.logo_path = NULL,
 		.interface = NULL,
 		.show_hostname = 0,
 		.show_date = 0,
@@ -119,21 +230,24 @@ struct Config config_file() {
 
 	// Search for the config file in the home directory
 	for (int i = 0; i < 2; ++i) {
-		snprintf(config_file_path, sizeof(config_file_path), "%s/%s", home_dir, config_file_names[i]);
+		int ret = snprintf(config_file_path, sizeof(config_file_path), "%s/%s", home_dir, config_file_names[i]);
+		if (ret < 0 || ret >= sizeof(config_file_path)) {
+			fprintf(stderr, "Error: Config file path is too long\n");
+			exit(EXIT_FAILURE);
+		}
 		file = fopen(config_file_path, "r");
 		if (file != NULL) {
 			break;  // File found, exit loop
 		}
 	}
-
 	// If config file not found in home directory, search in etc directory
 	if (file == NULL) {
 		snprintf(config_file_path, sizeof(config_file_path), "/etc/%s", config_file_names[0]);
 		file = fopen(config_file_path, "r");
-		if (file == NULL) {
-			fprintf(stderr, "Error: Unable to open config file\n");
-			exit(EXIT_FAILURE);
-		}
+	}
+	if (file == NULL) {
+		fprintf(stderr, "Error: Unable to open config file: %s\n", config_file_path);
+		exit(EXIT_FAILURE);
 	}
 
 	char line[MAX_LINE_LENGTH];
@@ -141,22 +255,21 @@ struct Config config_file() {
 	while (fgets(line, sizeof(line), file)) {
 		line[strcspn(line, "\n")] = '\0';
 
-		char *logo = extract_logo(line);
-		if (logo != NULL) {
-			config.logo = logo;
+		char *logo_path = extract_logo(line);
+		if (logo_path != NULL) {
+			config.logo_path = logo_path;
 			continue;  // Move to the next line
 		}
 		// Extract interface option
 		if (strstr(line, "interface=")) {
 			const char *interface_start = strchr(line, '=') + 1;
 			size_t interface_length = strlen(interface_start);
-			config.interface = malloc((interface_length + 1) * sizeof(*config.interface));
+			config.interface = calloc((interface_length + 1), sizeof(*config.interface));
 			if (config.interface == NULL) {
 				perror("Failed to allocate memory for interface");
 				exit(EXIT_FAILURE);
 			}
-			strncpy(config.interface, interface_start, interface_length);
-			config.interface[interface_length] = '\0';
+			strlcpy(config.interface, interface_start, interface_length + 1);
 		}
 		// Check other configuration options
 		if (strstr(line, "date=yes")) {
@@ -202,11 +315,9 @@ void update_public_ip() {
 		exit(EXIT_FAILURE);
 	} else {
 		if (fgets(buffer, sizeof(buffer), fp) != NULL) {
-			// Copy the public IP address to the global variable
-			strncpy(public_ip, buffer, MAX_IP_LENGTH);
-			// Remove trailing newline character, if any
-			public_ip[strcspn(public_ip, "\n")] = '\0';
+			buffer[strcspn(buffer, "\n")] = '\0';
 		}
+		strlcpy(public_ip, buffer, sizeof(public_ip));
 		pclose(fp);
 	}
 }
@@ -231,30 +342,24 @@ char *get_hostname() {
 void update_internal_ip(struct Config config) {
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in *sa;
+	bool found = false;
 
 	if (getifaddrs(&ifap) == -1) {
 		perror("getifaddrs");
 		exit(EXIT_FAILURE);
 	}
-	// Search for the specified interface or fallback to lo0
-	if (config.interface == NULL || strlen(config.interface) == 0) {
-		strncpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
-	} else {
-		// Search for the specified interface
-		bool found = false;
-		for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
-			if (strcmp(ifa->ifa_name, config.interface) == 0 &&
-				ifa->ifa_addr != NULL &&
-				ifa->ifa_addr->sa_family == AF_INET) {
-				sa = (struct sockaddr_in *) ifa->ifa_addr;
-				inet_ntop(AF_INET, &(sa->sin_addr), internal_ip, sizeof(internal_ip));
-				found = true;
-				break;
-			}
+	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, config.interface) == 0 &&
+			ifa->ifa_addr != NULL &&
+			ifa->ifa_addr->sa_family == AF_INET) {
+			sa = (struct sockaddr_in *) ifa->ifa_addr;
+			inet_ntop(AF_INET, &(sa->sin_addr), internal_ip, sizeof(internal_ip));
+			found = true;
+			break;
 		}
-		if (!found) {
-			strncpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
-		}
+	}
+	if (!found) {
+		strlcpy(internal_ip, "127.0.0.1", sizeof(internal_ip));
 	}
 	freeifaddrs(ifap);
 }
@@ -282,9 +387,9 @@ void update_vpn() {
 	freeifaddrs(ifap);
 
 	if (has_wg_interface)
-		printf(" VPN ");
+		strlcpy(vpn_status, "VPN", sizeof(vpn_status));
 	else
-		printf(" No VPN ");
+		strlcpy(vpn_status, "No VPN", sizeof(vpn_status));
 }
 
 // Function to update memory usage
@@ -399,24 +504,24 @@ void update_battery() {
 	struct apm_power_info pi;
 
 	if ((fd = open("/dev/apm", O_RDONLY)) == -1) {
-		strncpy(battery_percent, "N/A", sizeof(battery_percent));
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		close(fd);
-		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (close(fd) == -1) {
-		strncpy(battery_percent, "N/A", sizeof(battery_percent));
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
 	if (pi.battery_state == (unsigned char)APM_BATT_UNKNOWN ||
 		pi.battery_state == (unsigned char)APM_BATTERY_ABSENT) {
-		strncpy(battery_percent, "N/A", sizeof(battery_percent));
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 	snprintf(battery_percent, sizeof(battery_percent), "%d%%", pi.battery_life);
@@ -441,24 +546,21 @@ void update_windowid(char *window_id) {
 	FILE *pipe = popen(command, "r");
 	if (pipe == NULL) {
 		fprintf(stderr, "Error: Failed to open pipe for xprop command");
-		strncpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
+		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		return;
 	}
-
 	char output[MAX_OUTPUT_LENGTH];
 	if (fgets(output, MAX_OUTPUT_LENGTH, pipe) == NULL) {
 		fprintf(stderr, "Error: Failed to read xprop command output");
-		strncpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
+		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
 		pclose(pipe);
 		return;
-	} else {
-		size_t len = strlen(output);
-		if (len > 0 && output[len - 1] == '\n') {
-			output[len - 1] = '\0';
-		}
-		strncpy(window_id, output, MAX_OUTPUT_LENGTH);
 	}
-
+	size_t len = strlen(output);
+	if (len > 0 && output[len - 1] == '\n') {
+		output[len - 1] = '\0';
+	}
+	strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
 	pclose(pipe);
 }
 
@@ -480,7 +582,7 @@ void draw_truncated_text(Display *display, Window window, GC gc, int x,
 		text_width = calculate_text_width(display, gc, text);
 	}
 	char truncated_text[len + 1];
-	strncpy(truncated_text, text, len);
+	strlcpy(truncated_text, text, len + 1);
 	truncated_text[len] = '\0';
 	XDrawString(display, window, gc, x, y, truncated_text, len);
 }
@@ -503,7 +605,7 @@ void draw_text(Display *display, Window window, GC gc, int x, int y,
 // by the '|' character.
 int calculate_total_text_width(Display *display, GC gc, const char *text) {
 	char buffer[1024];
-	strncpy(buffer, text, sizeof(buffer));
+	strlcpy(buffer, text, sizeof(buffer));
 	buffer[sizeof(buffer) - 1] = '\0';
 
 	char *saveptr;
@@ -521,7 +623,7 @@ int calculate_total_text_width(Display *display, GC gc, const char *text) {
 void draw_text_tokens(Display *display, Window window, GC gc, int x, int y,
 	const char *text) {
 	char buffer[1024];
-	strncpy(buffer, text, sizeof(buffer));
+	strlcpy(buffer, text, sizeof(buffer));
 	buffer[sizeof(buffer) - 1] = '\0';
 
 	char *saveptr;
@@ -548,13 +650,12 @@ void draw_centered_text(Display *display, Window window, GC gc, int x,
 // and enters the main event loop to update and draw the status bar.
 int main(int argc, const char *argv[]) {
 	// Set locale for UTF-8
-	setlocale(LC_CTYPE, "C");
-	setlocale(LC_ALL, "en_US.UTF-8");
+	setlocale(LC_ALL, "C.UTF-8");
 
 	// Read the config file
-	struct Config config = config_file();
-	if (config.logo == NULL) {
-		fprintf(stderr, "Error: Unable to read name from config file\n");
+	struct Config config = read_config_file();
+	if (config.logo_path == NULL) {
+		fprintf(stderr, "Error: Unable to read logo path from config file\n");
 		return 1;
 	}
 
@@ -565,24 +666,18 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
-	int screen = DefaultScreen(display);
-	unsigned long black = BlackPixel(display, screen);
-	unsigned long white = WhitePixel(display, screen);
-	unsigned long bg_color = (config.background_color == 1) ? black : white;
-	unsigned long fg_color = (config.background_color == 1) ? white : black;
-
+	unsigned long fg_color = config.background_color == 0 ? BLACK_COLOR : WHITE_COLOR;
+	unsigned long bg_color = BlackPixel(display, screen);
+	// Define a named constant for bar height
+	#define BAR_HEIGHT 20
+	
 	// Get screen dimensions
 	int screen_width = DisplayWidth(display, screen);
 	int bar_width = screen_width;  // Width of the bar set to screen width
-	int bar_height = 20;  // Height of the bar
+	int bar_height = BAR_HEIGHT;  // Height of the bar
 	int x = 0;  // Start position of the bar
 	int y = 0;  // Position the bar at the top
-
-	// Create window
 	Window window = XCreateSimpleWindow(display, RootWindow(display, screen), x, y, bar_width, bar_height, 1, fg_color, bg_color);
-	XStoreName(display, window, "OpenBar");
-
-	// Set window to be always on top and avoid being managed by the window manager
 	XSetWindowAttributes attrs;
 	attrs.override_redirect = True;
 	XChangeWindowAttributes(display, window, CWOverrideRedirect, &attrs);
@@ -613,25 +708,25 @@ int main(int argc, const char *argv[]) {
 		// Collect and concatenate text parts with separators
 		if (config.show_winid) {
 			update_windowid(window_id);
-			strncpy(text_buffer, window_id, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
-		}
+			strlcat(text_buffer, window_id, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 
-		if (config.logo != NULL && strlen(config.logo) > 0) {
-			strncpy(text_buffer, config.logo, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+		}
+		if (config.logo_path != NULL && strlen(config.logo_path) > 0) {
+			strlcat(text_buffer, config.logo_path, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
-			strncpy(text_buffer, hostname, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, hostname, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_date) {
 			update_datetime();
-			strncpy(text_buffer, datetime, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, datetime, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_cpu) {
@@ -640,35 +735,35 @@ int main(int argc, const char *argv[]) {
 			update_cpu_base_speed();
 			char cpu_info[MAX_OUTPUT_LENGTH * 2];
 			snprintf(cpu_info, sizeof(cpu_info), "CPU: %s (%s)", cpu_avg_speed, cpu_temp);
-			strncpy(text_buffer, cpu_info, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, cpu_info, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(mem_info, sizeof(mem_info), "Mem: %.0llu MB", free_memory);
-			strncpy(text_buffer, mem_info, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, mem_info, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_load) {
 			update_system_load(system_load);
 			char load_info[MAX_OUTPUT_LENGTH];
 			snprintf(load_info, sizeof(load_info), "Load: %.2f", system_load[0]);
-			strncpy(text_buffer, load_info, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, load_info, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_bat) {
 			update_battery();
-			strncpy(text_buffer, battery_percent, sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, battery_percent, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_vpn) {
 			update_vpn();
-			strncpy(text_buffer, "VPN ", sizeof(text_buffer));
-			strncpy(text_buffer, " | ", sizeof(text_buffer));
+			strlcat(text_buffer, "VPN ", sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		if (config.show_net) {
@@ -676,7 +771,8 @@ int main(int argc, const char *argv[]) {
 			update_internal_ip(config);
 			char net_info[MAX_OUTPUT_LENGTH];
 			snprintf(net_info, sizeof(net_info), "IPs: %s ~ %s", public_ip, internal_ip);
-			strncpy(text_buffer, net_info, sizeof(text_buffer));
+			strlcat(text_buffer, net_info, sizeof(text_buffer));
+			strlcat(text_buffer, " | ", sizeof(text_buffer));
 		}
 
 		// Center the text horizontally
@@ -685,8 +781,7 @@ int main(int argc, const char *argv[]) {
 		// Draw the centered text with separators
 		draw_centered_text(display, window, gc, 0, text_y, text_buffer, bar_width);
 
-		XFlush(display);  // Flush the X11 buffer to update the window
-		struct timespec req = {2, 0};  // 2 seconds, 0 nanoseconds
+		struct timespec req = {SLEEP_DURATION, 0};  // Sleep duration in seconds
 		nanosleep(&req, NULL);  // Sleep for 2 seconds before the next update
 	}
 
