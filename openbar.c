@@ -580,6 +580,11 @@ void draw_text_centered(Display *display, Window window, GC gc, int x, int y, co
 	draw_text_segments(display, window, gc, text_x, y, text);
 }
 
+// Function to calculate the width of the text
+int calculate_text_width(Display *display, GC gc, const char *text) {
+	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
+}
+
 // Main function
 // This function initializes the X11 display, reads the configuration file,
 // and enters the main event loop to update and draw the status bar.
@@ -631,6 +636,8 @@ int main(int argc, const char *argv[]) {
 
 	// Show the window
 	XMapWindow(display, window);
+
+	struct timespec req = { .tv_sec = SLEEP_DURATION, .tv_nsec = 0 };
 
 	// Main event loop
 	while (1) {
