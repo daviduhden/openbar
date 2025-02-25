@@ -119,7 +119,7 @@ char *extract_logo(const char *line)
 		// Allocate memory for the logo and copy it
 		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
 		if (logo == NULL) {
-			perror("No logo.");
+			perror("Failed to allocate memory for logo");
 			exit(EXIT_FAILURE);
 		}
 		strncpy(logo, logo_start, logo_length);
@@ -173,7 +173,7 @@ struct Config config_file()
 			size_t interface_length = strlen(interface_start);
 			config.interface = malloc(interface_length + 1);
 			if (config.interface == NULL) {
-				perror("No if.");
+				perror("Failed to allocate memory for interface");
 				exit(EXIT_FAILURE);
 			}
 			strncpy(config.interface, interface_start,
@@ -542,6 +542,10 @@ void draw_text(Display *display, Window window, GC gc, const char *text) {
 
 	// Get the width of the text
 	XFontStruct *font_info = XQueryFont(display, XGContextFromGC(gc));
+	if (font_info == NULL) {
+		fprintf(stderr, "Error: Failed to query font information\n");
+		return;
+	}
 	int text_width = XTextWidth(font_info, text, strlen(text));
 
 	// Calculate the starting position to center the text
