@@ -54,6 +54,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <netdb.h>
+#include <ifaddrs.h>  // Add this header for getifaddrs and freeifaddrs
 
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
@@ -77,7 +78,6 @@ static char cpu_avg_speed[32];
 static char datetime[32];
 static char public_ip[MAX_IP_LENGTH];
 static char internal_ip[INET_ADDRSTRLEN];
-char vpn_status[16];
 static char vpn_status[16];
 char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
@@ -294,6 +294,11 @@ void update_internal_ip(struct Config config)
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in *sa;
 
+	if (getifaddrs(&ifap) == -1) {
+		perror("getifaddrs");
+		exit(EXIT_FAILURE);
+	}
+
 	// Search for the specified interface
 	bool found_interface = false;
 	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
@@ -309,10 +314,6 @@ void update_internal_ip(struct Config config)
 	// Fallback to lo0 if no other interface is found
 	if (!found_interface) {
 		strlcpy(internal_ip, "lo0", sizeof(internal_ip));
-	}
-				break;
-			}
-		}
 	}
 
 	freeifaddrs(ifap);
@@ -565,6 +566,7 @@ void draw_text(Display *display, Window window, GC gc, const char *text) {
 
 // Function declaration
 void draw_text(Display *display, Window window, GC gc, const char *text);
+void update_internal_ip(struct Config config);
 
 // Main function
 int main(int argc, const char *argv[])
@@ -595,14 +597,14 @@ int main(int argc, const char *argv[])
 		snprintf(buffer, sizeof(buffer), "\r\e[K");
 
 		if (config.show_winid) {
-		if (config.logo != NULL && strlen(config.logo) > 0) {
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
+			update_windowid(window_id);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s[%s]%s", RESET, window_id, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
-			free(config.logo); // Free the allocated memory for logo
 		}
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			free(config.logo); // Free the allocated memory for logo
 		}
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
@@ -649,12 +651,13 @@ int main(int argc, const char *argv[])
 		draw_text(display, window, gc, buffer);
 
 		fflush(stdout);
-		if (argc == 2)
+		if (argc == 2 && strcmp(argv[1], "-1") == 0) {
+			break;
+		}
 		usleep(2000000);
-			if (strcmp(argv[1], "-1") == 0)
-		usleep(2000000);
-		XCloseDisplay(display);
-		return 0;
 	}
+
+	XCloseDisplay(display);
+	return 0;
 }
 
