@@ -38,7 +38,6 @@ winid=yes
 hostname=yes
 interface=iwm0
 vpn=yes
-background=white
 ```
 
 The "logo" and "interface" options are configurable. "logo" will display any specified text, and "interface" is used to get the internal IP address of your machine.
