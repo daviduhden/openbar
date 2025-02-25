@@ -34,18 +34,17 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <ifaddrs.h>
 #include <net/if.h>
+#include <sys/socket.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-
-#include <sys/sysctl.h>
 #include <sys/sensors.h>
 #include <machine/apmvar.h>
+#include <sys/sysctl.h>
 
 #include <wchar.h>
 #include <time.h>
@@ -79,12 +78,16 @@ static char datetime[32];
 static char public_ip[MAX_IP_LENGTH];
 static char internal_ip[INET_ADDRSTRLEN];
 char vpn_status[16];
-char mem_info[32];
+static char vpn_status[16];
 char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
 
 // Define configuration structure
+// The Config structure holds configuration options for the application.
+// It includes options for displaying various system information such as
+// hostname, date, CPU usage, memory usage, battery status, system load,
+// window ID, network information, and VPN status.
 struct Config {
 	char *logo;
 	char *interface;
@@ -132,28 +135,24 @@ char *extract_logo(const char *line)
 // Read configuration file
 struct Config config_file()
 {
-	struct Config config = { NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
-	const char *home_dir = getenv("HOME");
-	if (home_dir == NULL) {
-		fprintf(stderr, "Error: HOME environment variable not set\n");
-		exit(EXIT_FAILURE);
-	}
+	struct Config config = {
+		.logo = NULL,
+		.interface = NULL,
+		.show_hostname = 0,
+		.show_date = 0,
+		.show_cpu = 0,
+		.show_mem = 0,
+		.show_bat = 0,
+		.show_load = 0,
+		.show_winid = 0,
+		.show_net = 0,
+		.show_vpn = 0
+	};
 
-	const char *config_file_names[] = { "termbar.conf", ".termbar.conf" };
-	FILE *file = NULL;
-	char config_file_path[256];
-
-	for (int i = 0; i < 2; ++i) {
-		snprintf(config_file_path, sizeof(config_file_path), "%s/%s",
-				 home_dir, config_file_names[i]);
-		file = fopen(config_file_path, "r");
-		if (file != NULL) {
-			break;  // File found, exit loop
-		}
-	}
-
+	const char *config_file_path = "/etc/openbar.conf";
+	FILE *file = fopen(config_file_path, "r");
 	if (file == NULL) {
-		fprintf(stderr, "Error: Unable to open config file\n");
+		fprintf(stderr, "Error: Unable to open config file at %s\n", config_file_path);
 		exit(EXIT_FAILURE);
 	}
 
@@ -176,8 +175,7 @@ struct Config config_file()
 				perror("Failed to allocate memory for interface");
 				exit(EXIT_FAILURE);
 			}
-			strncpy(config.interface, interface_start,
-					interface_length);
+			strncpy(config.interface, interface_start, interface_length);
 			config.interface[interface_length] = '\0';
 		}
 		// Check configuration options
@@ -218,7 +216,7 @@ void update_public_ip()
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if (getaddrinfo("ifconfig.me", "http", &hints, &res) != 0) {
+	if (getaddrinfo("ifconfig.me", "http", &hints, &res) != 0 || res == NULL) {
 		perror("getaddrinfo");
 		exit(EXIT_FAILURE);
 	}
@@ -238,14 +236,18 @@ void update_public_ip()
 	}
 
 	const char *request = "GET / HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
-	if (send(sockfd, request, strlen(request), 0) == -1) {
-		perror("send");
-		close(sockfd);
-		freeaddrinfo(res);
-		exit(EXIT_FAILURE);
+	ssize_t total_sent = 0;
+	ssize_t request_len = strlen(request);
+	while (total_sent < request_len) {
+		ssize_t sent = send(sockfd, request + total_sent, request_len - total_sent, 0);
+		if (sent == -1) {
+			perror("send");
+			close(sockfd);
+	ssize_t bytes_received;
+	size_t total_bytes_received = 0;
+	while ((bytes_received = recv(sockfd, buffer + total_bytes_received, sizeof(buffer) - 1 - total_bytes_received, 0)) > 0) {
+		total_bytes_received += bytes_received;
 	}
-
-	ssize_t bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
 	if (bytes_received == -1) {
 		perror("recv");
 		close(sockfd);
@@ -253,9 +255,15 @@ void update_public_ip()
 		exit(EXIT_FAILURE);
 	}
 
-	buffer[bytes_received] = '\0';
+	buffer[total_bytes_received] = '\0';
 	char *ip_start = strstr(buffer, "\r\n\r\n");
 	if (ip_start != NULL) {
+		ip_start += 4; // Skip the "\r\n\r\n"
+		strncpy(public_ip, ip_start, MAX_IP_LENGTH);
+		public_ip[strcspn(public_ip, "\n")] = '\0';
+	} else {
+		strncpy(public_ip, "N/A", MAX_IP_LENGTH);
+	}
 		ip_start += 4; // Skip the "\r\n\r\n"
 		strncpy(public_ip, ip_start, MAX_IP_LENGTH);
 		public_ip[strcspn(public_ip, "\n")] = '\0';
@@ -286,22 +294,22 @@ void update_internal_ip(struct Config config)
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in *sa;
 
-	if (getifaddrs(&ifap) == -1) {
-		perror("getifaddrs");
-		exit(EXIT_FAILURE);
+	// Search for the specified interface
+	bool found_interface = false;
+	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
+		if (config.interface != NULL && strcmp(ifa->ifa_name, config.interface) == 0 &&
+			ifa->ifa_addr != NULL && ifa->ifa_addr->sa_family == AF_INET) {
+			sa = (struct sockaddr_in *) ifa->ifa_addr;
+			inet_ntop(AF_INET, &(sa->sin_addr), internal_ip, sizeof(internal_ip));
+			found_interface = true;
+			break;
+		}
 	}
-	// Search for the specified interface or fallback to lo0
-	if (config.interface == NULL || strlen(config.interface) == 0) {
+
+	// Fallback to lo0 if no other interface is found
+	if (!found_interface) {
 		strlcpy(internal_ip, "lo0", sizeof(internal_ip));
-	} else {
-		// Search for the specified interface
-		for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
-			if (strcmp(ifa->ifa_name, config.interface) == 0 &&
-				ifa->ifa_addr != NULL
-				&& ifa->ifa_addr->sa_family == AF_INET) {
-				sa = (struct sockaddr_in *) ifa->ifa_addr;
-				inet_ntop(AF_INET, &(sa->sin_addr), internal_ip,
-						  sizeof(internal_ip));
+	}
 				break;
 			}
 		}
@@ -314,7 +322,7 @@ void update_internal_ip(struct Config config)
 void update_vpn()
 {
 	struct ifaddrs *ifap, *ifa;
-	int has_wg_interface = 0;
+	volatile int has_wg_interface = 0;
 
 	if (getifaddrs(&ifap) == -1) {
 		perror("getifaddrs");
@@ -340,12 +348,12 @@ void update_vpn()
 // Update memory information
 unsigned long long update_mem()
 {
-	int mib[2];
+	int mib[2] = { CTL_VM, VM_UVMEXP };
 	size_t len;
 	unsigned long long freemem;
 
-	mib[0] = CTL_VM;
-	mib[1] = VM_UVMEXP;
+	mib[0] = CTL_HW;
+	mib[1] = HW_CPUSPEED;
 
 	len = sizeof(struct uvmexp);
 
@@ -471,8 +479,8 @@ void update_datetime()
 // Update window ID
 void update_windowid(char *window_id)
 {
-	const char *command =
-		"xprop -root 32c '\\t$0' _NET_CURRENT_DESKTOP | cut -f 2";
+	char command[MAX_OUTPUT_LENGTH];
+	snprintf(command, sizeof(command), "xprop -root 32c '\\t$0' _NET_CURRENT_DESKTOP | cut -f 2");
 
 	FILE *pipe = popen(command, "r");
 	if (pipe == NULL) {
@@ -555,6 +563,9 @@ void draw_text(Display *display, Window window, GC gc, const char *text) {
 	XDrawString(display, window, gc, x_position, y_position, text, strlen(text));
 }
 
+// Function declaration
+void draw_text(Display *display, Window window, GC gc, const char *text);
+
 // Main function
 int main(int argc, const char *argv[])
 {
@@ -584,9 +595,10 @@ int main(int argc, const char *argv[])
 		snprintf(buffer, sizeof(buffer), "\r\e[K");
 
 		if (config.show_winid) {
-			update_windowid(window_id);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s[%s]%s", RESET, window_id, RESET);
+		if (config.logo != NULL && strlen(config.logo) > 0) {
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			free(config.logo); // Free the allocated memory for logo
 		}
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
@@ -634,17 +646,15 @@ int main(int argc, const char *argv[])
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sIPs:%s %s ~ %s ", GREEN, RESET, public_ip, internal_ip);
 		}
 
-		void draw_text(Display *display, Window window, GC gc, const char *text);
 		draw_text(display, window, gc, buffer);
 
 		fflush(stdout);
 		if (argc == 2)
-			if (strcmp("-1", argv[1]) >= 0)
+		usleep(2000000);
 			if (strcmp(argv[1], "-1") == 0)
 		usleep(2000000);
+		XCloseDisplay(display);
+		return 0;
 	}
-
-	XCloseDisplay(display);
-	return 0;
 }
 
