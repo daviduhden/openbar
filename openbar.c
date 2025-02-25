@@ -531,6 +531,26 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XMapRaised(*display, *window);
 }
 
+// Define the draw_text function
+void draw_text(Display *display, Window window, GC gc, const char *text) {
+	XClearWindow(display, window);
+
+	// Get the width of the window
+	XWindowAttributes window_attributes;
+	XGetWindowAttributes(display, window, &window_attributes);
+	int window_width = window_attributes.width;
+
+	// Get the width of the text
+	XFontStruct *font_info = XQueryFont(display, XGContextFromGC(gc));
+	int text_width = XTextWidth(font_info, text, strlen(text));
+
+	// Calculate the starting position to center the text
+	int x_position = (window_width - text_width) / 2;
+	int y_position = 20; // Fixed y position
+
+	XDrawString(display, window, gc, x_position, y_position, text, strlen(text));
+}
+
 // Main function
 int main(int argc, const char *argv[])
 {
