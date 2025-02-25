@@ -506,6 +506,11 @@ int get_text_width(Display *display, GC gc, const char *text) {
 	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
 }
 
+// Function to calculate the width of the text
+int calculate_text_width(Display *display, GC gc, const char *text) {
+	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
+}
+
 // Function to draw truncated text on the X11 window
 // This function draws the text truncated to fit within the specified
 // maximum width.
@@ -578,11 +583,6 @@ void draw_text_centered(Display *display, Window window, GC gc, int x, int y, co
 	int total_text_width = get_total_text_width(display, gc, text);
 	int text_x = (max_width - total_text_width) / 2;
 	draw_text_segments(display, window, gc, text_x, y, text);
-}
-
-// Function to calculate the width of the text
-int calculate_text_width(Display *display, GC gc, const char *text) {
-	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
 }
 
 // Main function
