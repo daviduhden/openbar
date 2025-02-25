@@ -56,17 +56,7 @@ exec cwm & exec openbar
 For `cwm`, you might want to leave a gap at the top of the screen for `openbar` by adding the following to your `.cwmrc` file:
 
 ```sh
-gap 20
-```
-
-## Dependencies
-
-Currently, `curl` is required to check your public IP address.
-
-Install it using:
-
-```sh
-pkg_add curl
+gap 30
 ```
 
 ## Building

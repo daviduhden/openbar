@@ -179,7 +179,7 @@ struct Config config_file()
 					interface_length);
 			config.interface[interface_length] = '\0';
 		}
-		// Check confs
+		// Check configuration options
 		if (strstr(line, "date=yes")) {
 			config.show_date = 1;
 		} else if (strstr(line, "cpu=yes")) {
