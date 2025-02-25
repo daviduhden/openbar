@@ -69,6 +69,7 @@
 #define RED         "\x1b[38;2;255;0;0m"
 #define RESET       "\x1b[0m"
 
+// Declare global variables
 static char battery_percent[32];
 static char cpu_temp[32];
 static char cpu_base_speed[32];
@@ -82,6 +83,7 @@ char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
 
+// Define configuration structure
 struct Config {
 	char *logo;
 	char *interface;
@@ -96,6 +98,7 @@ struct Config {
 	int show_vpn;
 };
 
+// Extract logo from configuration line
 char *extract_logo(const char *line)
 {
 	if (strstr(line, "logo=")) {
@@ -125,6 +128,7 @@ char *extract_logo(const char *line)
 	return NULL;
 }
 
+// Read configuration file
 struct Config config_file()
 {
 	struct Config config = { NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -201,6 +205,7 @@ struct Config config_file()
 	return config;
 }
 
+// Update public IP address
 void update_public_ip()
 {
 	FILE *fp;
@@ -222,6 +227,7 @@ void update_public_ip()
 	pclose(fp);
 }
 
+// Get hostname
 char *get_hostname()
 {
 	static char hostname[HOSTNAME_MAX_LENGTH];
@@ -234,6 +240,7 @@ char *get_hostname()
 	return hostname;
 }
 
+// Update internal IP address
 void update_internal_ip(struct Config config)
 {
 	struct ifaddrs *ifap, *ifa;
@@ -263,6 +270,7 @@ void update_internal_ip(struct Config config)
 	freeifaddrs(ifap);
 }
 
+// Update VPN status
 void update_vpn()
 {
 	struct ifaddrs *ifap, *ifa;
@@ -289,6 +297,7 @@ void update_vpn()
 		printf(" %sNo VPN%s ", RED, RESET);
 }
 
+// Update memory information
 unsigned long long update_mem()
 {
 	int mib[2];
@@ -314,6 +323,7 @@ unsigned long long update_mem()
 	return freemem;
 }
 
+// Update CPU base speed
 void update_cpu_base_speed()
 {
 	int temp = 0;
@@ -328,6 +338,7 @@ void update_cpu_base_speed()
 				 temp);
 }
 
+// Update CPU average speed
 void update_cpu_avg_speed()
 {
 	uint64_t freq = 0;
@@ -341,6 +352,7 @@ void update_cpu_avg_speed()
 	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
 }
 
+// Update system load
 void update_system_load(double *load_avg)
 {
 	double load[3];         // Take 1, 5, and 15-minute load averages
@@ -355,6 +367,7 @@ void update_system_load(double *load_avg)
 	}
 }
 
+// Update CPU temperature
 void update_cpu_temp()
 {
 	struct sensor sensor;
@@ -387,6 +400,7 @@ void update_cpu_temp()
 	snprintf(cpu_temp, sizeof(cpu_temp), "x");
 }
 
+// Update battery information
 void update_battery()
 {
 	int fd;
@@ -413,6 +427,7 @@ void update_battery()
 	}
 }
 
+// Update date and time
 void update_datetime()
 {
 	time_t rawtime;
@@ -422,6 +437,7 @@ void update_datetime()
 	strftime(datetime, sizeof(datetime), "%a %d %b %H:%M", timeinfo);
 }
 
+// Update window ID
 void update_windowid(char *window_id)
 {
 	const char *command =
@@ -453,6 +469,7 @@ void update_windowid(char *window_id)
 	strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
 }
 
+// Create Xlib window
 void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	*display = XOpenDisplay(NULL);
 	if (*display == NULL) {
@@ -486,11 +503,13 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XMapRaised(*display, *window);
 }
 
+// Draw text on Xlib window
 void draw_text(Display *display, Window window, GC gc, const char *text) {
 	XClearWindow(display, window);
 	XDrawString(display, window, gc, 10, 20, text, strlen(text));
 }
 
+// Main function
 int main(int argc, const char *argv[])
 {
 	Display *display;
