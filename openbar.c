@@ -54,6 +54,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+#include <netdb.h>
 
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
@@ -115,6 +116,13 @@ char *extract_logo(const char *line)
 		// Calculate the length of the logo string
 		size_t logo_length = logo_end - logo_start;
 
+		// Allocate memory for the logo and copy it
+		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
+		if (logo == NULL) {
+			perror("No logo.");
+			exit(EXIT_FAILURE);
+		}
+		strncpy(logo, logo_start, logo_length);
 		// Allocate memory for the logo and copy it
 		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
 		if (logo == NULL) {
@@ -213,7 +221,6 @@ void update_public_ip()
 
 	struct addrinfo hints, *res;
 	int sockfd;
-	char buffer[INET_ADDRSTRLEN];
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -251,8 +258,8 @@ void update_public_ip()
 		perror("recv");
 		close(sockfd);
 		freeaddrinfo(res);
-	if (config.interface == NULL || strlen(config.interface) == 0) {
-		config.interface = strdup("lo0");
+		exit(EXIT_FAILURE);
+	}
 
 	buffer[bytes_received] = '\0';
 	char *ip_start = strstr(buffer, "\r\n\r\n");
@@ -390,7 +397,6 @@ void update_cpu_avg_speed()
 		fprintf(stderr, "Error: Failed to get CPU average speed\n");
 		return;
 	}
-	}
 	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
 }
 
@@ -447,20 +453,6 @@ void update_battery()
 
 	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
 		ioctl(fd, APM_IOC_GETPOWER, &pi) == -1 || close(fd) == -1) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
-	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
-		ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
-		if (fd != -1) {
-			close(fd);
-		}
-		return;
-	}
-
-	if (close(fd) == -1) {
-		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
-		return;
-	}
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
@@ -522,26 +514,6 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	if (*display == NULL) {
 		fprintf(stderr, "Cannot open display\n");
 		exit(1);
-	*window = XCreateSimpleWindow(*display, RootWindow(*display, *screen), 0, 0, window_width, window_height, 1,
-								  BlackPixel(*display, *screen), WhitePixel(*display, *screen));
-	if (!*window) {
-		fprintf(stderr, "Error: Failed to create window\n");
-		XCloseDisplay(*display);
-		exit(1);
-	}
-
-	if (!XSelectInput(*display, *window, ExposureMask | KeyPressMask)) {
-		fprintf(stderr, "Error: Failed to select input\n");
-		XDestroyWindow(*display, *window);
-		XCloseDisplay(*display);
-		exit(1);
-	}
-
-	if (!XMapWindow(*display, *window)) {
-		fprintf(stderr, "Error: Failed to map window\n");
-		XDestroyWindow(*display, *window);
-		XCloseDisplay(*display);
-		exit(1);
 	}
 	int window_width = screen_width;
 	int window_height = 30; // Fixed height for the bar
@@ -564,11 +536,6 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XSetBackground(*display, *gc, WhitePixel(*display, *screen));
 	XClearWindow(*display, *window);
 	XMapRaised(*display, *window);
-}
-
-	// Set locale to UTF-8
-	setlocale(LC_ALL, "en_US.UTF-8");
-	XDrawString(display, window, gc, 10, 20, text, strlen(text));
 }
 
 // Main function
