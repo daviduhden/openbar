@@ -414,8 +414,8 @@ void update_battery() {
 		return;
 	}
 
-	if (pi.battery_state == APM_BATT_UNKNOWN ||
-		pi.battery_state == APM_BATTERY_ABSENT) {
+	if (pi.battery_state == (unsigned char)APM_BATT_UNKNOWN ||
+		pi.battery_state == (unsigned char)APM_BATTERY_ABSENT) {
 		strncpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
