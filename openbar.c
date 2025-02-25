@@ -595,6 +595,8 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
+	int screen = DefaultScreen(display);
+
 	unsigned long fg_color = config.background_color == 0 ? BLACK_COLOR : WHITE_COLOR;
 	unsigned long bg_color = BlackPixel(display, screen);
 	// Define a named constant for bar height
