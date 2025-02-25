@@ -31,11 +31,7 @@
 #define OPENBAR_H
 
 #include <stdint.h>
-
-// Define u_long, u_char, and u_int as standard equivalents
-typedef unsigned long u_long;
-typedef unsigned char u_char;
-typedef unsigned int u_int;
+#include <sys/types.h>
 
 // Definitions for various lengths and sizes used in the program
 #define INET_ADDRSTRLEN 16
