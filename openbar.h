@@ -44,11 +44,6 @@
 #define IFF_UP 0x1
 #endif
 
-// Replace u_long, u_char, and u_int with their standard equivalents
-#define u_long unsigned long
-#define u_char unsigned char
-#define u_int unsigned int
-
 // Global variables for storing various system information
 static char battery_percent[32];
 static char cpu_temp[32];
