@@ -334,6 +334,8 @@ unsigned long long update_mem() {
 	mib[0] = CTL_VM;
 	mib[1] = VM_UVMEXP;
 
+	len = sizeof(struct uvmexp);
+
 	struct uvmexp uvm_stats;
 
 	if (sysctl(mib, 2, &uvm_stats, &len, NULL, 0) == -1) {
