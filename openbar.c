@@ -163,6 +163,9 @@ struct Config config_file()
 
 		char *logo = extract_logo(line);
 		if (logo != NULL) {
+			if (config.logo != NULL) {
+				free(config.logo); // Free previously allocated memory
+			}
 			config.logo = logo;
 			continue;       // Move to the next line
 		}
@@ -170,6 +173,9 @@ struct Config config_file()
 		if (strstr(line, "interface=")) {
 			const char *interface_start = strchr(line, '=') + 1;
 			size_t interface_length = strlen(interface_start);
+			if (config.interface != NULL) {
+				free(config.interface); // Free previously allocated memory
+			}
 			config.interface = malloc(interface_length + 1);
 			if (config.interface == NULL) {
 				perror("Failed to allocate memory for interface");
@@ -652,6 +658,14 @@ int main(int argc, const char *argv[])
 			break;
 		}
 		usleep(2000000);
+	}
+
+	// Free allocated memory for config.logo and config.interface
+	if (config.logo != NULL) {
+		free(config.logo);
+	}
+	if (config.interface != NULL) {
+		free(config.interface);
 	}
 
 	XCloseDisplay(display);
