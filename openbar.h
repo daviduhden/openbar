@@ -30,6 +30,8 @@
 #ifndef OPENBAR_H
 #define OPENBAR_H
 
+#include <stdint.h>
+
 // Definitions for various lengths and sizes used in the program
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
@@ -136,5 +138,16 @@ void draw_centered_text(Display *display, Window window, GC gc, int x, int y, co
 
 // Declaration for the getloadavg function
 int getloadavg(double loadavg[], int nelem);
+
+struct apm_power_info {
+    uint8_t battery_state;
+    uint8_t ac_state;
+    uint8_t battery_life;
+    uint8_t spare1;
+    uint32_t minutes_left;
+    uint32_t spare2[6];
+    uint32_t dev;
+    uint32_t mode;
+};
 
 #endif // OPENBAR_H
