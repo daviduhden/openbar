@@ -53,7 +53,7 @@
 #include <X11/Xutil.h>
 
 // Definitions for various lengths and sizes used in the program
-#define SLEEP_DURATION 2  // Sleep duration in seconds
+#define SLEEP_DURATION 2
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
 #define MAX_LINE_LENGTH 256
@@ -63,6 +63,9 @@
 // Define color values for readability
 #define BLACK_COLOR 0x000000
 #define WHITE_COLOR 0xFFFFFF
+
+// Define a named constant for bar height
+#define BAR_HEIGHT 20
 
 // Define IFF_UP if not defined
 #ifndef IFF_UP
@@ -77,7 +80,7 @@ static char cpu_avg_speed[32];
 static char datetime[32];
 static char public_ip[MAX_IP_LENGTH];
 static char internal_ip[INET_ADDRSTRLEN];
-char vpn_status[16];
+static char vpn_status[16];
 static char mem_info[32];
 static char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
@@ -354,6 +357,7 @@ void update_cpu_base_speed() {
 	int mib[2] = { CTL_HW, HW_CPUSPEED };
 
 	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1) {
+		perror("sysctl");
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "no_freq");
 	} else {
 		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMHz", temp);
@@ -399,12 +403,15 @@ void update_cpu_temp() {
 	int temp = -1;
 
 	static int temp_mib = -1;
-
 	if (temp_mib == -1) {
-		for (temp_mib = 0; temp_mib < 20; temp_mib++) {
+		const int max_sensors = 20;  // Define an upper limit for the loop
+		for (temp_mib = 0; temp_mib < max_sensors; temp_mib++) {
 			int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };  // acpitz0.temp0 (x395)
 			if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1)
 				break;
+		}
+		if (temp_mib == max_sensors) {
+			temp_mib = -1;  // Reset temp_mib if no valid sensor is found
 		}
 	}
 
@@ -433,6 +440,7 @@ void update_battery() {
 	struct apm_power_info pi;
 
 	if ((fd = open("/dev/apm", O_RDONLY)) == -1) {
+		perror("Failed to open /dev/apm");
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
@@ -494,15 +502,14 @@ void update_windowid(char *window_id) {
 }
 
 // Function to draw text on the X11 window
-// This function calculates the width of the given text.
-int calculate_text_width(Display *display, GC gc, const char *text) {
+int get_text_width(Display *display, GC gc, const char *text) {
 	return XTextWidth(XQueryFont(display, XGContextFromGC(gc)), text, strlen(text));
 }
 
 // Function to draw truncated text on the X11 window
 // This function draws the text truncated to fit within the specified
 // maximum width.
-void draw_truncated_text(Display *display, Window window, GC gc, int x,
+void draw_text_with_max_width(Display *display, Window window, GC gc, int x,
 	int y, const char *text, int max_width) {
 	int len = strlen(text);
 	int text_width = calculate_text_width(display, gc, text);
@@ -523,7 +530,7 @@ void draw_text(Display *display, Window window, GC gc, int x, int y,
 	const char *text, int max_width) {
 	int text_width = calculate_text_width(display, gc, text);
 	if (text_width > max_width) {
-		draw_truncated_text(display, window, gc, x, y, text, max_width);
+		draw_text_with_max_width(display, window, gc, x, y, text, max_width);
 	} else {
 		XDrawString(display, window, gc, x, y, text, strlen(text));
 	}
@@ -532,7 +539,7 @@ void draw_text(Display *display, Window window, GC gc, int x, int y,
 // Function to calculate the total width of text tokens
 // This function calculates the total width of the text tokens separated
 // by the '|' character.
-int calculate_total_text_width(Display *display, GC gc, const char *text) {
+int get_total_text_width(Display *display, GC gc, const char *text) {
 	char buffer[1024];
 	strlcpy(buffer, text, sizeof(buffer));
 	buffer[sizeof(buffer) - 1] = '\0';
@@ -549,7 +556,7 @@ int calculate_total_text_width(Display *display, GC gc, const char *text) {
 
 // Function to draw text tokens on the X11 window
 // This function draws the text tokens separated by the '|' character.
-void draw_text_tokens(Display *display, Window window, GC gc, int x, int y,
+void draw_text_segments(Display *display, Window window, GC gc, int x, int y,
 	const char *text) {
 	char buffer[1024];
 	strlcpy(buffer, text, sizeof(buffer));
@@ -567,11 +574,10 @@ void draw_text_tokens(Display *display, Window window, GC gc, int x, int y,
 // Function to draw centered text on the X11 window
 // This function draws the text centered within the specified maximum
 // width.
-void draw_centered_text(Display *display, Window window, GC gc, int x,
-	int y, const char *text, int max_width) {
-	int total_text_width = calculate_total_text_width(display, gc, text);
+void draw_text_centered(Display *display, Window window, GC gc, int x, int y, const char *text, int max_width) {
+	int total_text_width = get_total_text_width(display, gc, text);
 	int text_x = (max_width - total_text_width) / 2;
-	draw_text_tokens(display, window, gc, text_x, y, text);
+	draw_text_segments(display, window, gc, text_x, y, text);
 }
 
 // Main function
@@ -598,9 +604,7 @@ int main(int argc, const char *argv[]) {
 	int screen = DefaultScreen(display);
 
 	unsigned long fg_color = config.background_color == 0 ? BLACK_COLOR : WHITE_COLOR;
-	unsigned long bg_color = BlackPixel(display, screen);
-	// Define a named constant for bar height
-	#define BAR_HEIGHT 20
+	unsigned long bg_color = config.background_color == 0 ? WHITE_COLOR : BLACK_COLOR;
 	
 	// Get screen dimensions
 	int screen_width = DisplayWidth(display, screen);
@@ -710,9 +714,12 @@ int main(int argc, const char *argv[]) {
 		const int text_y = 15;  // Y position for text, adjusted for smaller height
 
 		// Draw the centered text with separators
-		draw_centered_text(display, window, gc, 0, text_y, text_buffer, bar_width);
+		draw_text_centered(display, window, gc, 0, text_y, text_buffer, bar_width);
 
-		struct timespec req = {SLEEP_DURATION, 0};  // Sleep duration in seconds
+		if (nanosleep(&req, NULL) == -1) {
+			perror("nanosleep");
+			exit(EXIT_FAILURE);
+		}
 		nanosleep(&req, NULL);  // Sleep for 2 seconds before the next update
 	}
 
