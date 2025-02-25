@@ -44,6 +44,11 @@
 #define IFF_UP 0x1
 #endif
 
+// Replace u_long, u_char, and u_int with their standard equivalents
+#define u_long unsigned long
+#define u_char unsigned char
+#define u_int unsigned int
+
 // Global variables for storing various system information
 static char battery_percent[32];
 static char cpu_temp[32];
@@ -139,15 +144,7 @@ void draw_centered_text(Display *display, Window window, GC gc, int x, int y, co
 // Declaration for the getloadavg function
 int getloadavg(double loadavg[], int nelem);
 
-struct apm_power_info {
-    uint8_t battery_state;
-    uint8_t ac_state;
-    uint8_t battery_life;
-    uint8_t spare1;
-    uint32_t minutes_left;
-    uint32_t spare2[6];
-    uint32_t dev;
-    uint32_t mode;
-};
+// Forward declaration for the apm_power_info struct
+struct apm_power_info;
 
 #endif // OPENBAR_H
