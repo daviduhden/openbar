@@ -123,13 +123,6 @@ char *extract_logo(const char *line)
 			exit(EXIT_FAILURE);
 		}
 		strncpy(logo, logo_start, logo_length);
-		// Allocate memory for the logo and copy it
-		char *logo = (char *) malloc((logo_length + 1) * sizeof(char));
-		if (logo == NULL) {
-			perror("No logo.");
-			exit(EXIT_FAILURE);
-		}
-		strncpy(logo, logo_start, logo_length);
 		logo[logo_length] = '\0';
 		return logo;
 	}
@@ -216,7 +209,6 @@ struct Config config_file()
 // Update public IP address
 void update_public_ip()
 {
-	FILE *fp;
 	char buffer[128];
 
 	struct addrinfo hints, *res;
@@ -515,6 +507,7 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 		fprintf(stderr, "Cannot open display\n");
 		exit(1);
 	}
+	int screen_width = DisplayWidth(*display, *screen);
 	int window_width = screen_width;
 	int window_height = 30; // Fixed height for the bar
 
@@ -617,6 +610,7 @@ int main(int argc, const char *argv[])
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sIPs:%s %s ~ %s ", GREEN, RESET, public_ip, internal_ip);
 		}
 
+		void draw_text(Display *display, Window window, GC gc, const char *text);
 		draw_text(display, window, gc, buffer);
 
 		fflush(stdout);
