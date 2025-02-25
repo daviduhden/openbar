@@ -131,7 +131,7 @@ char *extract_logo(const char *line)
 // Read configuration file
 struct Config config_file()
 {
-	struct Config config = { NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
+	struct Config config = { NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 0 };
 	const char *home_dir = getenv("HOME");
 	if (home_dir == NULL) {
 		fprintf(stderr, "Error: HOME environment variable not set\n");
@@ -211,20 +211,61 @@ void update_public_ip()
 	FILE *fp;
 	char buffer[128];
 
-	// to-do I need a better thing than curl
-	fp = popen("/usr/local/bin/curl -s ifconfig.me", "r");
-	if (fp == NULL) {
-		perror("popen");
+	struct addrinfo hints, *res;
+	int sockfd;
+	char buffer[INET_ADDRSTRLEN];
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if (getaddrinfo("ifconfig.me", "http", &hints, &res) != 0) {
+		perror("getaddrinfo");
 		exit(EXIT_FAILURE);
 	}
 
-	if (fgets(buffer, sizeof(buffer), fp) != NULL) {
-		// Copy the public IP address to the global variable
-		strncpy(public_ip, buffer, MAX_IP_LENGTH);
-		// Remove trailing newline character, if any
-		public_ip[strcspn(public_ip, "\n")] = '\0';
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sockfd == -1) {
+		perror("socket");
+		freeaddrinfo(res);
+		exit(EXIT_FAILURE);
 	}
-	pclose(fp);
+
+	if (connect(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
+		perror("connect");
+		close(sockfd);
+		freeaddrinfo(res);
+		exit(EXIT_FAILURE);
+	}
+
+	const char *request = "GET / HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
+	if (send(sockfd, request, strlen(request), 0) == -1) {
+		perror("send");
+		close(sockfd);
+		freeaddrinfo(res);
+		exit(EXIT_FAILURE);
+	}
+
+	ssize_t bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+	if (bytes_received == -1) {
+		perror("recv");
+		close(sockfd);
+		freeaddrinfo(res);
+	if (config.interface == NULL || strlen(config.interface) == 0) {
+		config.interface = strdup("lo0");
+
+	buffer[bytes_received] = '\0';
+	char *ip_start = strstr(buffer, "\r\n\r\n");
+	if (ip_start != NULL) {
+		ip_start += 4; // Skip the "\r\n\r\n"
+		strncpy(public_ip, ip_start, MAX_IP_LENGTH);
+		public_ip[strcspn(public_ip, "\n")] = '\0';
+	} else {
+		strncpy(public_ip, "N/A", MAX_IP_LENGTH);
+	}
+
+	close(sockfd);
+	freeaddrinfo(res);
 }
 
 // Get hostname
@@ -292,9 +333,9 @@ void update_vpn()
 	freeifaddrs(ifap);
 
 	if (has_wg_interface)
-		printf(" %sVPN%s ", GREEN, RESET);
+		snprintf(vpn_status, sizeof(vpn_status), "%sVPN%s", GREEN, RESET);
 	else
-		printf(" %sNo VPN%s ", RED, RESET);
+		snprintf(vpn_status, sizeof(vpn_status), "%sNo VPN%s", RED, RESET);
 }
 
 // Update memory information
@@ -331,11 +372,12 @@ void update_cpu_base_speed()
 
 	int mib[5] = { CTL_HW, HW_CPUSPEED };
 
-	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1)
-		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "no_freq");
-	else
-		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMhz",
-				 temp);
+	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1) {
+		perror("sysctl HW_CPUSPEED");
+		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "error");
+	} else {
+		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMhz", temp);
+	}
 }
 
 // Update CPU average speed
@@ -344,10 +386,10 @@ void update_cpu_avg_speed()
 	uint64_t freq = 0;
 	size_t len = sizeof(freq);
 	int mib[2] = { CTL_HW, HW_CPUSPEED };
-
 	if (sysctl(mib, 2, &freq, &len, NULL, 0) == -1) {
-		perror("sysctl");
+		fprintf(stderr, "Error: Failed to get CPU average speed\n");
 		return;
+	}
 	}
 	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
 }
@@ -388,11 +430,8 @@ void update_cpu_temp()
 		int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
-			if (temp >= 0 && temp <= 100) { // hmmm could be more than 100?
-				snprintf(cpu_temp, sizeof(cpu_temp),
-						 "%d\302\260C", temp);
-				return;
-			}
+			snprintf(cpu_temp, sizeof(cpu_temp), "%d\302\260C", temp);
+			return;
 		}
 	}
 	// If no valid temperature reading found, set to "x"
@@ -409,11 +448,19 @@ void update_battery()
 	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
 		ioctl(fd, APM_IOC_GETPOWER, &pi) == -1 || close(fd) == -1) {
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
+		ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		if (fd != -1) {
+			close(fd);
+		}
 		return;
 	}
 
-	if (pi.battery_state == APM_BATT_UNKNOWN ||
-		pi.battery_state == APM_BATTERY_ABSENT) {
+	if (close(fd) == -1) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
@@ -475,11 +522,27 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	if (*display == NULL) {
 		fprintf(stderr, "Cannot open display\n");
 		exit(1);
+	*window = XCreateSimpleWindow(*display, RootWindow(*display, *screen), 0, 0, window_width, window_height, 1,
+								  BlackPixel(*display, *screen), WhitePixel(*display, *screen));
+	if (!*window) {
+		fprintf(stderr, "Error: Failed to create window\n");
+		XCloseDisplay(*display);
+		exit(1);
 	}
 
-	*screen = DefaultScreen(*display);
-	int screen_width = DisplayWidth(*display, *screen);
-	int screen_height = DisplayHeight(*display, *screen);
+	if (!XSelectInput(*display, *window, ExposureMask | KeyPressMask)) {
+		fprintf(stderr, "Error: Failed to select input\n");
+		XDestroyWindow(*display, *window);
+		XCloseDisplay(*display);
+		exit(1);
+	}
+
+	if (!XMapWindow(*display, *window)) {
+		fprintf(stderr, "Error: Failed to map window\n");
+		XDestroyWindow(*display, *window);
+		XCloseDisplay(*display);
+		exit(1);
+	}
 	int window_width = screen_width;
 	int window_height = 30; // Fixed height for the bar
 
@@ -503,9 +566,8 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XMapRaised(*display, *window);
 }
 
-// Draw text on Xlib window
-void draw_text(Display *display, Window window, GC gc, const char *text) {
-	XClearWindow(display, window);
+	// Set locale to UTF-8
+	setlocale(LC_ALL, "en_US.UTF-8");
 	XDrawString(display, window, gc, 10, 20, text, strlen(text));
 }
 
@@ -593,7 +655,7 @@ int main(int argc, const char *argv[])
 		fflush(stdout);
 		if (argc == 2)
 			if (strcmp("-1", argv[1]) >= 0)
-				return 0;
+			if (strcmp(argv[1], "-1") == 0)
 		usleep(2000000);
 	}
 
