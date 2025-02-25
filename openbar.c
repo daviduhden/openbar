@@ -243,6 +243,12 @@ void update_public_ip()
 		if (sent == -1) {
 			perror("send");
 			close(sockfd);
+			freeaddrinfo(res);
+			exit(EXIT_FAILURE);
+		}
+		total_sent += sent;
+	}
+
 	ssize_t bytes_received;
 	size_t total_bytes_received = 0;
 	while ((bytes_received = recv(sockfd, buffer + total_bytes_received, sizeof(buffer) - 1 - total_bytes_received, 0)) > 0) {
@@ -258,12 +264,6 @@ void update_public_ip()
 	buffer[total_bytes_received] = '\0';
 	char *ip_start = strstr(buffer, "\r\n\r\n");
 	if (ip_start != NULL) {
-		ip_start += 4; // Skip the "\r\n\r\n"
-		strncpy(public_ip, ip_start, MAX_IP_LENGTH);
-		public_ip[strcspn(public_ip, "\n")] = '\0';
-	} else {
-		strncpy(public_ip, "N/A", MAX_IP_LENGTH);
-	}
 		ip_start += 4; // Skip the "\r\n\r\n"
 		strncpy(public_ip, ip_start, MAX_IP_LENGTH);
 		public_ip[strcspn(public_ip, "\n")] = '\0';
@@ -352,9 +352,6 @@ unsigned long long update_mem()
 	int mib[2] = { CTL_VM, VM_UVMEXP };
 	size_t len;
 	unsigned long long freemem;
-
-	mib[0] = CTL_HW;
-	mib[1] = HW_CPUSPEED;
 
 	len = sizeof(struct uvmexp);
 
