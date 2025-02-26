@@ -13,7 +13,6 @@
 - Hostname
 - CPU speed and temperature
 - Free memory
-- Window ID
 - Load average
 - Battery status
 - Public IP address
@@ -34,7 +33,6 @@ bat=yes
 mem=yes
 load=yes
 net=yes
-winid=yes
 hostname=yes
 interface=iwm0
 vpn=yes

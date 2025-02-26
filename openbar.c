@@ -75,7 +75,6 @@ static char datetime[32];
 static char public_ip[MAX_IP_LENGTH];
 static char internal_ip[INET_ADDRSTRLEN];
 static char vpn_status[16];
-char window_id[MAX_OUTPUT_LENGTH];
 double system_load[3];
 unsigned long long free_memory;
 
@@ -93,7 +92,6 @@ struct Config {
 	int show_mem;
 	int show_bat;
 	int show_load;
-	int show_winid;
 	int show_net;
 	int show_vpn;
 };
@@ -153,7 +151,6 @@ struct Config config_file()
 		.show_mem = 0,
 		.show_bat = 0,
 		.show_load = 0,
-		.show_winid = 0,
 		.show_net = 0,
 		.show_vpn = 0
 	};
@@ -206,8 +203,6 @@ struct Config config_file()
 			config.show_net = 1;
 		} else if (strstr(line, "mem=yes")) {
 			config.show_mem = 1;
-		} else if (strstr(line, "winid=yes")) {
-			config.show_winid = 1;
 		} else if (strstr(line, "hostname=yes")) {
 			config.show_hostname = 1;
 		} else if (strstr(line, "vpn=yes")) {
@@ -489,38 +484,6 @@ void update_datetime()
 	strftime(datetime, sizeof(datetime), "%a %d %b %H:%M", timeinfo);
 }
 
-// Update window ID by querying the X server
-void update_windowid(char *window_id)
-{
-	char command[MAX_OUTPUT_LENGTH];
-	snprintf(command, sizeof(command), "xprop -root -f _NET_CURRENT_DESKTOP 32c _NET_CURRENT_DESKTOP | cut -d ' ' -f 3");
-
-	FILE *pipe = popen(command, "r");
-	if (pipe == NULL) {
-		fprintf(stderr,
-				"Error: Failed to open pipe for command execution");
-		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
-		return;
-	}
-
-	char output[MAX_OUTPUT_LENGTH];
-	if (fgets(output, MAX_OUTPUT_LENGTH, pipe) == NULL) {
-		fprintf(stderr, "Error: Failed to read command output");
-		strlcpy(window_id, "N/A", MAX_OUTPUT_LENGTH);
-		pclose(pipe);
-		return;
-	}
-
-	pclose(pipe);
-
-	size_t len = strlen(output);
-	if (len > 0 && output[len - 1] == '\n') {
-		output[len - 1] = '\0';
-	}
-
-	strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
-}
-
 // Create an Xlib window for displaying the status bar
 void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	*display = XOpenDisplay(NULL);
@@ -544,8 +507,12 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	Atom wm_state = XInternAtom(*display, "_NET_WM_STATE", False);
 	Atom wm_state_above = XInternAtom(*display, "_NET_WM_STATE_ABOVE", False);
 	Atom wm_bypass_wm = XInternAtom(*display, "_NET_WM_BYPASS_COMPOSITOR", False);
-	XChangeProperty(*display, *window, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char *)&wm_state_above, 1);
-	XChangeProperty(*display, *window, wm_bypass_wm, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&wm_bypass_wm, 1);
+	Atom wm_state_skip_taskbar = XInternAtom(*display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+	Atom wm_state_skip_pager = XInternAtom(*display, "_NET_WM_STATE_SKIP_PAGER", False);
+	Atom wm_state_sticky = XInternAtom(*display, "_NET_WM_STATE_STICKY", False);
+
+	Atom wm_state_atoms[] = { wm_state_above, wm_bypass_wm, wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky };
+	XChangeProperty(*display, *window, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char *)wm_state_atoms, 5);
 
 	*gc = XCreateGC(*display, *window, 0, NULL);
 	XSetForeground(*display, *gc, BlackPixel(*display, *screen));
@@ -609,13 +576,6 @@ int main(int argc, const char *argv[])
 	while (1) {
 		char buffer[1024];
 		snprintf(buffer, sizeof(buffer), "\r\e[K");
-
-		// Update and append window ID to buffer if enabled
-		if (config.show_winid) {
-			update_windowid(window_id);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s[%s]%s", RESET, window_id, RESET);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
-		}
 
 		// Append logo to buffer if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
