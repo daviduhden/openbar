@@ -528,6 +528,8 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 		fprintf(stderr, "Cannot open display\n");
 		exit(1);
 	}
+	*screen = DefaultScreen(*display);  // Initialize screen
+
 	int screen_width = DisplayWidth(*display, *screen);
 	int window_width = screen_width;
 	int window_height = 30; // Fixed height for the bar
