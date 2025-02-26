@@ -54,7 +54,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <netdb.h>
-#include <ifaddrs.h>  // Add this header for getifaddrs and freeifaddrs
+#include <ifaddrs.h>
 
 #define INET_ADDRSTRLEN 16
 #define MAX_IP_LENGTH 32
