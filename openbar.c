@@ -31,11 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
 #include <unistd.h>
 #include <fcntl.h>
 #include <net/if.h>
-#include <sys/socket.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -45,11 +43,9 @@
 #include <sys/sensors.h>
 #include <machine/apmvar.h>
 #include <sys/sysctl.h>
-
 #include <wchar.h>
 #include <time.h>
 #include <locale.h>
-
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -70,7 +66,7 @@
 #define RED         "\x1b[38;2;255;0;0m"
 #define RESET       "\x1b[0m"
 
-// Declare global variables
+// Declare global variables for storing system information
 static char battery_percent[32];
 static char cpu_temp[32];
 static char cpu_base_speed[32];
@@ -132,7 +128,20 @@ char *extract_logo(const char *line)
 	return NULL;
 }
 
-// Read configuration file
+// Free memory allocated for Config structure
+void free_config(struct Config *config)
+{
+	if (config->logo != NULL) {
+		free(config->logo);
+		config->logo = NULL;
+	}
+	if (config->interface != NULL) {
+		free(config->interface);
+		config->interface = NULL;
+	}
+}
+
+// Read configuration file and populate the Config structure
 struct Config config_file()
 {
 	struct Config config = {
@@ -210,7 +219,7 @@ struct Config config_file()
 	return config;
 }
 
-// Update public IP address
+// Update public IP address by querying an external service
 void update_public_ip()
 {
 	char buffer[128];
@@ -281,7 +290,7 @@ void update_public_ip()
 	freeaddrinfo(res);
 }
 
-// Get hostname
+// Get the hostname of the system
 char *get_hostname()
 {
 	static char hostname[HOSTNAME_MAX_LENGTH];
@@ -294,7 +303,7 @@ char *get_hostname()
 	return hostname;
 }
 
-// Update internal IP address
+// Update internal IP address by querying the specified network interface
 void update_internal_ip(struct Config config)
 {
 	struct ifaddrs *ifap, *ifa;
@@ -325,7 +334,7 @@ void update_internal_ip(struct Config config)
 	freeifaddrs(ifap);
 }
 
-// Update VPN status
+// Update VPN status by checking for active WireGuard interfaces
 void update_vpn()
 {
 	struct ifaddrs *ifap, *ifa;
@@ -352,7 +361,7 @@ void update_vpn()
 		snprintf(vpn_status, sizeof(vpn_status), "%sNo VPN%s", RED, RESET);
 }
 
-// Update memory information
+// Update memory information by querying system statistics
 unsigned long long update_mem()
 {
 	int mib[2] = { CTL_VM, VM_UVMEXP };
@@ -375,7 +384,7 @@ unsigned long long update_mem()
 	return freemem;
 }
 
-// Update CPU base speed
+// Update CPU base speed by querying system information
 void update_cpu_base_speed()
 {
 	int temp = 0;
@@ -391,7 +400,7 @@ void update_cpu_base_speed()
 	}
 }
 
-// Update CPU average speed
+// Update CPU average speed by querying system information
 void update_cpu_avg_speed()
 {
 	uint64_t freq = 0;
@@ -404,7 +413,7 @@ void update_cpu_avg_speed()
 	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
 }
 
-// Update system load
+// Update system load averages
 void update_system_load(double *load_avg)
 {
 	double load[3];         // Take 1, 5, and 15-minute load averages
@@ -419,7 +428,7 @@ void update_system_load(double *load_avg)
 	}
 }
 
-// Update CPU temperature
+// Update CPU temperature by querying system sensors
 void update_cpu_temp()
 {
 	struct sensor sensor;
@@ -449,7 +458,7 @@ void update_cpu_temp()
 	snprintf(cpu_temp, sizeof(cpu_temp), "x");
 }
 
-// Update battery information
+// Update battery information by querying APM (Advanced Power Management)
 void update_battery()
 {
 	int fd;
@@ -470,7 +479,7 @@ void update_battery()
 	}
 }
 
-// Update date and time
+// Update date and time information
 void update_datetime()
 {
 	time_t rawtime;
@@ -480,7 +489,7 @@ void update_datetime()
 	strftime(datetime, sizeof(datetime), "%a %d %b %H:%M", timeinfo);
 }
 
-// Update window ID
+// Update window ID by querying the X server
 void update_windowid(char *window_id)
 {
 	char command[MAX_OUTPUT_LENGTH];
@@ -512,7 +521,7 @@ void update_windowid(char *window_id)
 	strlcpy(window_id, output, MAX_OUTPUT_LENGTH);
 }
 
-// Create Xlib window
+// Create an Xlib window for displaying the status bar
 void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	*display = XOpenDisplay(NULL);
 	if (*display == NULL) {
@@ -543,7 +552,7 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XMapRaised(*display, *window);
 }
 
-// Define the draw_text function
+// Draw text on the Xlib window
 void draw_text(Display *display, Window window, GC gc, const char *text) {
 	XClearWindow(display, window);
 
@@ -566,8 +575,7 @@ void draw_text(Display *display, Window window, GC gc, const char *text) {
 
 	XDrawString(display, window, gc, x_position, y_position, text, strlen(text));
 }
-
-// Function declaration
+// Function declarations
 void draw_text(Display *display, Window window, GC gc, const char *text);
 void update_internal_ip(struct Config config);
 
@@ -579,45 +587,55 @@ int main(int argc, const char *argv[])
 	GC gc;
 	int screen;
 
+	// Create the Xlib window
 	create_window(&display, &window, &gc, &screen);
 
-	// We all want UTF8
+	// Set locale for UTF-8 support
 	setlocale(LC_CTYPE, "C");
 	setlocale(LC_ALL, "en_US.UTF-8");
 
-	// Read the config file
+	// Read the configuration file
 	struct Config config = config_file();
 	if (config.logo == NULL) {
-		fprintf(stderr, "Error: Unable to read name from config file\n");
+		fprintf(stderr, "Error: Unable to read logo from config file\n");
 		return 1;
 	}
 
-	// Hide cursor
+	// Hide cursor in terminal
 	printf("\e[?25l");
 
 	while (1) {
 		char buffer[1024];
 		snprintf(buffer, sizeof(buffer), "\r\e[K");
 
+		// Update and append window ID to buffer if enabled
 		if (config.show_winid) {
 			update_windowid(window_id);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s[%s]%s", RESET, window_id, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Append logo to buffer if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append hostname to buffer if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %s ", hostname);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append date/time to buffer if enabled
 		if (config.show_date) {
 			update_datetime();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %s ", datetime);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append CPU information to buffer if enabled
 		if (config.show_cpu) {
 			update_cpu_temp();
 			update_cpu_avg_speed();
@@ -625,49 +643,55 @@ int main(int argc, const char *argv[])
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sCPU:%s %s (%s) ", GREEN, RESET, cpu_avg_speed, cpu_temp);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append memory information to buffer if enabled
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sMem:%s %.0llu MB ", GREEN, RESET, free_memory);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append system load to buffer if enabled
 		if (config.show_load) {
 			update_system_load(system_load);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sLoad:%s %.2f ", GREEN, RESET, system_load[0]);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append battery information to buffer if enabled
 		if (config.show_bat) {
 			update_battery();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sBat:%s %s ", GREEN, RESET, battery_percent);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append VPN status to buffer if enabled
 		if (config.show_vpn) {
 			update_vpn();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
 		}
+
+		// Update and append network information to buffer if enabled
 		if (config.show_net) {
 			update_public_ip();
 			update_internal_ip(config);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sIPs:%s %s ~ %s ", GREEN, RESET, public_ip, internal_ip);
 		}
 
+		// Draw the buffer text on the Xlib window
 		draw_text(display, window, gc, buffer);
 
 		fflush(stdout);
 		if (argc == 2 && strcmp(argv[1], "-1") == 0) {
 			break;
 		}
-		usleep(2000000);
+		usleep(2000000); // Sleep for 2 seconds
 	}
 
 	// Free allocated memory for config.logo and config.interface
-	if (config.logo != NULL) {
-		free(config.logo);
-	}
-	if (config.interface != NULL) {
-		free(config.interface);
-	}
+	free_config(&config);
 
+	// Close the Xlib display
 	XCloseDisplay(display);
 	return 0;
 }
-
