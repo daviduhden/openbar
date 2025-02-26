@@ -510,11 +510,16 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	Atom wm_state_skip_taskbar = XInternAtom(*display, "_NET_WM_STATE_SKIP_TASKBAR", False);
 	Atom wm_state_skip_pager = XInternAtom(*display, "_NET_WM_STATE_SKIP_PAGER", False);
 	Atom wm_state_sticky = XInternAtom(*display, "_NET_WM_STATE_STICKY", False);
+	XMoveWindow(*display, *window, 0, 0);
 
 	Atom wm_state_atoms[] = { wm_state_above, wm_bypass_wm, wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky };
 	XChangeProperty(*display, *window, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char *)wm_state_atoms, 5);
 
 	*gc = XCreateGC(*display, *window, 0, NULL);
+	if (*gc == NULL) {
+		fprintf(stderr, "Cannot create graphics context\n");
+		exit(1);
+	}
 	XSetForeground(*display, *gc, BlackPixel(*display, *screen));
 	XSetBackground(*display, *gc, WhitePixel(*display, *screen));
 	XClearWindow(*display, *window);
