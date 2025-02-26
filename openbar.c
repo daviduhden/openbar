@@ -607,7 +607,6 @@ int main(int argc, const char *argv[])
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
-			free(config.logo); // Free the allocated memory for logo
 		}
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
