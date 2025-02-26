@@ -493,7 +493,7 @@ void update_datetime()
 void update_windowid(char *window_id)
 {
 	char command[MAX_OUTPUT_LENGTH];
-	snprintf(command, sizeof(command), "xprop -root -f _NET_CURRENT_DESKTOP 32c | cut -d ' ' -f 3");
+	snprintf(command, sizeof(command), "xprop -root -f _NET_CURRENT_DESKTOP 32c _NET_CURRENT_DESKTOP | cut -d ' ' -f 3");
 
 	FILE *pipe = popen(command, "r");
 	if (pipe == NULL) {
