@@ -209,7 +209,7 @@ struct Config config_file()
 // Update public IP address by querying an external service
 void update_public_ip()
 {
-	char buffer[128];
+	char buffer[1024];
 
 	struct addrinfo hints, *res;
 	int sockfd;
@@ -583,8 +583,11 @@ int main(int argc, const char *argv[])
 	// Hide cursor in terminal
 	printf("\e[?25l");
 
+	int ip_update_counter = 0;
+
 	while (1) {
 		char buffer[1024];
+		buffer[0] = '\0';
 
 		// Append logo to buffer if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
@@ -644,7 +647,9 @@ int main(int argc, const char *argv[])
 
 		// Update and append network information to buffer if enabled
 		if (config.show_net) {
-			update_public_ip();
+			if (ip_update_counter == 0) {
+				update_public_ip();
+			}
 			update_internal_ip(config);
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " IPs: %s ~ %s ", public_ip, internal_ip);
 		}
@@ -654,6 +659,8 @@ int main(int argc, const char *argv[])
 
 		// Flush the display to ensure all commands are sent
 		XFlush(display);
+
+		ip_update_counter = (ip_update_counter + 1) % 10;
 
 		fflush(stdout);
 		if (argc == 2 && strcmp(argv[1], "-1") == 0) {
