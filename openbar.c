@@ -58,14 +58,6 @@
 #define MAX_OUTPUT_LENGTH 16
 #define HOSTNAME_MAX_LENGTH 256
 
-// Define ANSI escape codes for color formatting
-#define PURPLE      "\x1b[38;2;138;43;226m"
-#define ORANGE      "\x1b[38;2;255;165;0m"
-#define GREEN       "\x1b[38;2;0;128;0m"
-#define YELLOW      "\x1b[38;2;255;255;0m"
-#define RED         "\x1b[38;2;255;0;0m"
-#define RESET       "\x1b[0m"
-
 // Declare global variables for storing system information
 static char battery_percent[32];
 static char cpu_temp[32];
@@ -351,9 +343,9 @@ void update_vpn()
 	freeifaddrs(ifap);
 
 	if (has_wg_interface)
-		snprintf(vpn_status, sizeof(vpn_status), "%sVPN%s", GREEN, RESET);
+		snprintf(vpn_status, sizeof(vpn_status), "VPN");
 	else
-		snprintf(vpn_status, sizeof(vpn_status), "%sNo VPN%s", RED, RESET);
+		snprintf(vpn_status, sizeof(vpn_status), "No VPN");
 }
 
 // Update memory information by querying system statistics
@@ -469,8 +461,8 @@ void update_battery()
 		snprintf(battery_percent, sizeof(battery_percent), "%d%%",
 				 pi.battery_life);
 	} else {
-		snprintf(battery_percent, sizeof(battery_percent), "%s%d%%%s",
-				 RED, pi.battery_life, RESET);
+		snprintf(battery_percent, sizeof(battery_percent), "%d%%",
+				 pi.battery_life);
 	}
 }
 
@@ -597,22 +589,22 @@ int main(int argc, const char *argv[])
 
 		// Append logo to buffer if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s%s%s", GREEN, config.logo, RESET);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s", config.logo);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append hostname to buffer if enabled
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %s ", hostname);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append date/time to buffer if enabled
 		if (config.show_date) {
 			update_datetime();
 			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %s ", datetime);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append CPU information to buffer if enabled
@@ -620,42 +612,42 @@ int main(int argc, const char *argv[])
 			update_cpu_temp();
 			update_cpu_avg_speed();
 			update_cpu_base_speed();
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sCPU:%s %s (%s) ", GREEN, RESET, cpu_avg_speed, cpu_temp);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " CPU: %s (%s) ", cpu_avg_speed, cpu_temp);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append memory information to buffer if enabled
 		if (config.show_mem) {
 			free_memory = update_mem();
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sMem:%s %.0llu MB ", GREEN, RESET, free_memory);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " Mem: %.0llu MB ", free_memory);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append system load to buffer if enabled
 		if (config.show_load) {
 			update_system_load(system_load);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sLoad:%s %.2f ", GREEN, RESET, system_load[0]);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " Load: %.2f ", system_load[0]);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append battery information to buffer if enabled
 		if (config.show_bat) {
 			update_battery();
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sBat:%s %s ", GREEN, RESET, battery_percent);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " Bat: %s ", battery_percent);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append VPN status to buffer if enabled
 		if (config.show_vpn) {
 			update_vpn();
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%s|%s", PURPLE, RESET);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "|");
 		}
 
 		// Update and append network information to buffer if enabled
 		if (config.show_net) {
 			update_public_ip();
 			update_internal_ip(config);
-			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " %sIPs:%s %s ~ %s ", GREEN, RESET, public_ip, internal_ip);
+			snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " IPs: %s ~ %s ", public_ip, internal_ip);
 		}
 
 		// Draw the buffer text on the Xlib window
