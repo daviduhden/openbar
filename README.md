@@ -26,7 +26,7 @@ If the CPU has no sensors or is not supported, it will display an "x" next to th
 `openbar` uses a configuration file that should be located in your home directory as `.openbar.conf` or `openbar.conf`. If these files are not found in your home directory, `openbar` will fall back to using the system-wide configuration file located at `/etc/openbar.conf`. You can find an example configuration file with all available options [here](openbar.conf):
 
 ```ini
-logo=openbar
+logo=OpenBar
 date=yes
 cpu=yes
 bat=yes
