@@ -237,7 +237,7 @@ void update_public_ip()
 		exit(EXIT_FAILURE);
 	}
 
-	const char *request = "GET / HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
+	const char *request = "GET /ip HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
 	ssize_t total_sent = 0;
 	ssize_t request_len = strlen(request);
 	while (total_sent < request_len) {
