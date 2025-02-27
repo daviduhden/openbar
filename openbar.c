@@ -436,7 +436,7 @@ void update_cpu_temp()
 		int mib[5] = { CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0 };
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
-			snprintf(cpu_temp, sizeof(cpu_temp), "%d\302\260C", temp);
+			snprintf(cpu_temp, sizeof(cpu_temp), "%d C", temp);
 			return;
 		}
 	}
@@ -585,7 +585,6 @@ int main(int argc, const char *argv[])
 
 	while (1) {
 		char buffer[1024];
-		snprintf(buffer, sizeof(buffer), "\r\e[K");
 
 		// Append logo to buffer if available
 		if (config.logo != NULL && strlen(config.logo) > 0) {
