@@ -525,6 +525,8 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 	XFontStruct *font_info = XLoadQueryFont(*display, "fixed");
 	if (!font_info) {
 		fprintf(stderr, "Error: Failed to load font 'fixed'\n");
+		XFreeGC(*display, *gc);
+		XCloseDisplay(*display);
 		exit(1);
 	}
 	XSetFont(*display, *gc, font_info->fid);
