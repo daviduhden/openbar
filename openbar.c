@@ -520,6 +520,15 @@ void create_window(Display **display, Window *window, GC *gc, int *screen) {
 		fprintf(stderr, "Cannot create graphics context\n");
 		exit(1);
 	}
+
+	// Load and set the font for the GC
+	XFontStruct *font_info = XLoadQueryFont(*display, "fixed");
+	if (!font_info) {
+		fprintf(stderr, "Error: Failed to load font 'fixed'\n");
+		exit(1);
+	}
+	XSetFont(*display, *gc, font_info->fid);
+
 	XSetForeground(*display, *gc, BlackPixel(*display, *screen));
 	XSetBackground(*display, *gc, WhitePixel(*display, *screen));
 	XClearWindow(*display, *window);
@@ -548,6 +557,8 @@ void draw_text(Display *display, Window window, GC gc, const char *text) {
 	int y_position = 20; // Fixed y position
 
 	XDrawString(display, window, gc, x_position, y_position, text, strlen(text));
+	// Flush the display to ensure all commands are sent
+	XFlush(display);
 }
 // Function declarations
 void draw_text(Display *display, Window window, GC gc, const char *text);
@@ -556,6 +567,10 @@ void update_internal_ip(struct Config config);
 // Main function
 int main(int argc, const char *argv[])
 {
+	// Set locale for UTF-8 support
+	setlocale(LC_CTYPE, "C");
+	setlocale(LC_ALL, "en_US.UTF-8");
+
 	Display *display;
 	Window window;
 	GC gc;
@@ -563,10 +578,6 @@ int main(int argc, const char *argv[])
 
 	// Create the Xlib window
 	create_window(&display, &window, &gc, &screen);
-
-	// Set locale for UTF-8 support
-	setlocale(LC_CTYPE, "C");
-	setlocale(LC_ALL, "en_US.UTF-8");
 
 	// Read the configuration file
 	struct Config config = config_file();
@@ -647,6 +658,9 @@ int main(int argc, const char *argv[])
 
 		// Draw the buffer text on the Xlib window
 		draw_text(display, window, gc, buffer);
+
+		// Flush the display to ensure all commands are sent
+		XFlush(display);
 
 		fflush(stdout);
 		if (argc == 2 && strcmp(argv[1], "-1") == 0) {
