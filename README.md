@@ -59,7 +59,11 @@ gap 30
 
 ## Building
 
-All necessary tools are included in your OpenBSD base installation. To clone the repository and build the project, use the following commands:
+All necessary tools are included in your OpenBSD base installation except git. To clone the repository and build the project, use the following commands:
+
+```sh
+git clone https://github.com/daviduhden/openbar.git
+```
 
 ```sh
 git clone https://github.com/daviduhden/openbar.git
