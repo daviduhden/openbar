@@ -5,6 +5,7 @@ OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
 CFLAGS = -pipe -Wall -Werror -march=native -std=c11
 INCLUDEDIR = -I/usr/X11R6/include -I.
+INFO = ==> 
 
 # Targets
 TARGET = openbar
@@ -24,51 +25,54 @@ all: build
 # Build target with debugging flags
 .PHONY: build
 build: clean
-	@echo "Building ${TARGET} with debugging flags..."
+	@echo "${INFO} Building ${TARGET} (debug)"
 	@${CC} ${DBGFLAGS} ${CFLAGS} ${INCLUDEDIR} -o ${TARGET} openbar.c ${LIBS}
 
 # Build target with optimization flags
 .PHONY: opt
 opt: clean
-	@echo "Building ${TARGET} with optimization flags..."
+	@echo "${INFO} Building ${TARGET} (opt)"
 	@${CC} ${OPTFLAGS} ${CFLAGS} ${INCLUDEDIR} -o ${TARGET} openbar.c ${LIBS}
 
 # Install target to copy the executable, config, and man pages to appropriate directories
 .PHONY: install
 install: ${TARGET}
-	@echo "Installing ${TARGET} to ${INSTALLTARGET}..."
+	@echo "${INFO} Installing ${TARGET} -> ${INSTALLTARGET}"
 	@mkdir -p ${BINDIR}
 	@install -s ${TARGET} ${INSTALLTARGET}
-	@echo "Installing ${CONFIG} to ${INSTALLCONFIG}..."
+	@echo "${INFO} Installing ${CONFIG} -> ${INSTALLCONFIG}"
 	@mkdir -p ${CONFIGDIR}
 	@install -m 644 ${CONFIG} ${INSTALLCONFIG}
-	@echo "Installing man pages to ${MAN1} and ${MAN5}..."
+	@echo "${INFO} Installing man pages -> ${MAN1}/openbar.1 and ${MAN5}/openbar.conf.5"
 	@mkdir -p ${MAN1}
 	@mkdir -p ${MAN5}
 	@install -m 644 openbar.1 ${MAN1}/openbar.1
 	@install -m 644 openbar.conf.5 ${MAN5}/openbar.conf.5
+	@echo "${INFO} Install complete"
 
 # Clean target to remove build artifacts
 .PHONY: clean
 clean:
-	@echo "Cleaning up..."
+	@echo "${INFO} Cleaning up build artifacts"
 	@rm -f ${TARGET}
+	@echo "${INFO} Clean complete"
 
 # Uninstall target to remove the installed files
 .PHONY: uninstall
 uninstall:
-	@echo "Uninstalling ${INSTALLTARGET}..."
+	@echo "${INFO} Removing ${INSTALLTARGET}"
 	@rm -f ${INSTALLTARGET}
-	@echo "Removing ${INSTALLCONFIG}..."
+	@echo "${INFO} Removing ${INSTALLCONFIG}"
 	@rm -f ${INSTALLCONFIG}
-	@echo "Removing man pages from ${MAN1} and ${MAN5}..."
+	@echo "${INFO} Removing man pages from ${MAN1} and ${MAN5}"
 	@rm -f ${MAN1}/openbar.1
 	@rm -f ${MAN5}/openbar.conf.5
+	@echo "${INFO} Uninstall complete"
 
 # Debug target to run the program in a debugger
 .PHONY: debug
 debug: build
-	@echo "Starting debugger for ${TARGET}..."
+	@echo "${INFO} Starting debugger for ${TARGET}"
 	@egdb -q ./${TARGET} -ex "break main" -ex "run"
 
 # Help target to display available commands
