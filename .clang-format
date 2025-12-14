@@ -1,0 +1,86 @@
+# .clang-format — OpenBSD KNF (style(9)) approximation
+
+# Copyright (c) 2025 David Uhden Collado <david@uhden.dev>
+#
+# Permission to use, copy, modify, and distribute this configuration file for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THIS CONFIGURATION FILE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS FILE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+# FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT,
+# OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+# DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+# ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS FILE.
+
+BasedOnStyle: LLVM
+Language: Cpp
+
+# Limits and indentation
+ColumnLimit: 80
+UseTab: ForIndentation         # Tabs for indentation; spaces for alignment.
+TabWidth: 8                    # 8-column hard tab.
+IndentWidth: 8                 # One block level = 1 tab.
+ContinuationIndentWidth: 4     # Second-level indent = 4 spaces.
+
+# Braces
+BreakBeforeBraces: Linux       # Functions: brace on new line. Control stmts: same line. "} else" on same line.
+
+# switch/case
+IndentCaseLabels: false        # 'case' not indented relative to 'switch'.
+
+# Spacing/parentheses/operators
+SpaceBeforeParens: ControlStatements   # Space after if/for/while; none for function calls.
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+BreakBeforeBinaryOperators: None       # Operators at end of the previous line.
+
+# Pointers and references
+PointerAlignment: Right        # 'char *p'
+DerivePointerAlignment: false
+
+# Comments and macros
+ReflowComments: true
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 1
+AlignEscapedNewlines: Right    # Right-justify backslashes in multi-line macros.
+
+# Includes: order by categories (blank lines between groups)
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # 1) Kernel headers: <sys/...>
+  - Regex: '^<sys/.*>$'
+    Priority: 1
+  # 2) Networking: <net/...>, <netinet/...>
+  - Regex: '^<(net(/.*)?|netinet(/.*)?)>$'
+    Priority: 2
+  # 3) Other system headers (<...>)
+  - Regex: '^<.*>$'
+    Priority: 3
+  # 4) Local headers ("...")
+  - Regex: '^".*"$'
+    Priority: 4
+
+# Function signatures and wrapping
+BreakAfterReturnType: None                     # Don't break in declarations/prototypes.
+AlwaysBreakAfterDefinitionReturnType: TopLevel # Break for top-level definitions (style(9)).
+AlignAfterOpenBracket: DontAlign               # Use 4-space continuation, don't align to '('.
+
+# Short constructs on one line
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: false
+
+# Preprocessor
+IndentPPDirectives: None
+
+# Optional: treat common queue(3) macros as statements (uncomment if useful)
+# StatementMacros:
+#   - SLIST_FOREACH
+#   - LIST_FOREACH
+#   - TAILQ_FOREACH
