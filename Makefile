@@ -5,7 +5,7 @@ OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
 CFLAGS = -pipe -Wall -Werror -march=native -std=c11
 INCLUDEDIR = -I/usr/X11R6/include -I.
-INFO = ==> 
+INFO = ==>
 
 # Targets
 TARGET = openbar
@@ -37,18 +37,9 @@ opt: clean
 # Install target to copy the executable, config, and man pages to appropriate directories
 .PHONY: install
 install: ${TARGET}
-	@echo "${INFO} Installing ${TARGET} -> ${INSTALLTARGET}"
-	@mkdir -p ${BINDIR}
-	@install -s ${TARGET} ${INSTALLTARGET}
-	@echo "${INFO} Installing ${CONFIG} -> ${INSTALLCONFIG}"
-	@mkdir -p ${CONFIGDIR}
-	@install -m 644 ${CONFIG} ${INSTALLCONFIG}
-	@echo "${INFO} Installing man pages -> ${MAN1}/openbar.1 and ${MAN5}/openbar.conf.5"
-	@mkdir -p ${MAN1}
-	@mkdir -p ${MAN5}
-	@install -m 644 openbar.1 ${MAN1}/openbar.1
-	@install -m 644 openbar.conf.5 ${MAN5}/openbar.conf.5
-	@echo "${INFO} Install complete"
+	@echo "${INFO} Installing ${TARGET} -> ${INSTALLTARGET}" && mkdir -p ${BINDIR} && install -s ${TARGET} ${INSTALLTARGET}
+	@echo "${INFO} Installing ${CONFIG} -> ${INSTALLCONFIG}" && mkdir -p ${CONFIGDIR} && install -m 644 ${CONFIG} ${INSTALLCONFIG}
+	@echo "${INFO} Installing man pages -> ${MAN1}/openbar.1 and ${MAN5}/openbar.conf.5" && mkdir -p ${MAN1} ${MAN5} && install -m 644 openbar.1 ${MAN1}/openbar.1 && install -m 644 openbar.conf.5 ${MAN5}/openbar.conf.5 && echo "${INFO} Install complete"
 
 # Clean target to remove build artifacts
 .PHONY: clean
@@ -60,14 +51,9 @@ clean:
 # Uninstall target to remove the installed files
 .PHONY: uninstall
 uninstall:
-	@echo "${INFO} Removing ${INSTALLTARGET}"
-	@rm -f ${INSTALLTARGET}
-	@echo "${INFO} Removing ${INSTALLCONFIG}"
-	@rm -f ${INSTALLCONFIG}
-	@echo "${INFO} Removing man pages from ${MAN1} and ${MAN5}"
-	@rm -f ${MAN1}/openbar.1
-	@rm -f ${MAN5}/openbar.conf.5
-	@echo "${INFO} Uninstall complete"
+	@echo "${INFO} Removing ${INSTALLTARGET}" && rm -f ${INSTALLTARGET}
+	@echo "${INFO} Removing ${INSTALLCONFIG}" && rm -f ${INSTALLCONFIG}
+	@echo "${INFO} Removing man pages" && rm -f ${MAN1}/openbar.1 ${MAN5}/openbar.conf.5 && echo "${INFO} Uninstall complete"
 
 # Debug target to run the program in a debugger
 .PHONY: debug
@@ -78,11 +64,8 @@ debug: build
 # Help target to display available commands
 .PHONY: help
 help:
-	@echo "Available targets:"
-	@echo "  all        - Build the project with debugging flags"
-	@echo "  build      - Build the project with debugging flags"
-	@echo "  opt        - Build the project with optimization flags"
-	@echo "  install    - Install the executable, config, and man pages"
-	@echo "  clean      - Remove build artifacts"
-	@echo "  uninstall  - Remove the installed files"
-	@echo "  debug      - Run the program in a debugger"
+	@printf "Available targets:\n  all        - Build the project with debugging flags\n  build      - Build the project with debugging flags\n  opt        - Build the project with optimization flags\n  install    - Install the executable, config, and man pages\n  clean      - Remove build artifacts\n  uninstall  - Remove the installed files\n  debug      - Run the program in a debugger\n  test       - Placeholder for tests\n"
+
+.PHONY: test
+test:
+	@echo "${INFO} No automated tests defined"
