@@ -7,14 +7,23 @@ openbar \- status bar for cwm and other window managers
 is a status bar application designed for the cwm window manager, but it can also be used with other window managers. It displays various system information including CPU speed and temperature, memory usage, window ID, load average, battery status, public and private IP addresses, and VPN connection status.
 
 .SH OPTIONS
-There are no command-line options for 
-.B openbar.
-Configuration is done through the configuration file located in your home directory as 
-.B ~/.openbar.conf 
-or in the global directory as
-.B /etc/openbar.conf.
+.TP
+.B -1
+Run one update cycle and exit.
 
-If both files are present, the file in the user's home directory will take precedence.
+.TP
+.B -c
+Use a custom configuration file path.
+
+Configuration is loaded from, in order:
+.IP \(bu 2
+the file passed with
+.B -c
+.IP \(bu 2
+.B ~/.openbar.conf
+if it exists
+.IP \(bu 2
+.B /etc/openbar.conf
 
 .SH CONFIGURATION
 The configuration for 
@@ -22,6 +31,21 @@ The configuration for
 is specified in the configuration file. See the 
 .B openbar.conf(5)
 manual page for more details.
+
+.SH XRESOURCES
+You can customize font and colors using Xresources entries:
+.RS 4
+.nf
+openbar.font: fixed
+openbar.foreground: black
+openbar.background: white
+.fi
+.RE
+If not set, defaults are 
+.B fixed,
+.B black,
+and
+.B white.
 
 .SH USAGE
 To display 
@@ -39,13 +63,13 @@ you might want to leave a gap at the top of the screen by adding the following t
 .B .cwmrc
 file:
 .EX
-gap 20
+gap 30
 .EE
 
 .SH FILES
 .B ~/.openbar.conf
 .RS 4
-User-specific configuration file for 
+User-specific configuration file for
 .B openbar.
 .RE
 .B /etc/openbar.conf
@@ -53,6 +77,14 @@ User-specific configuration file for
 Global configuration file for 
 .B openbar.
 .RE
+
+.SH SECURITY
+.B openbar
+uses
+.BR pledge (2)
+and
+.BR unveil (2)
+to limit filesystem access and permitted syscalls on OpenBSD.
 
 .SH SEE ALSO
 .BR cwm (1),

@@ -39,10 +39,12 @@
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xresource.h>
 #include <X11/Xutil.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
+#include <limits.h>
 #include <locale.h>
 #include <machine/apmvar.h>
 #include <netdb.h>
@@ -80,6 +82,9 @@ unsigned long long free_memory;
 struct Config {
 	char *logo;
 	char *interface;
+	char *font;
+	char *foreground;
+	char *background;
 	int show_hostname;
 	int show_date;
 	int show_cpu;
@@ -133,14 +138,53 @@ free_config(struct Config *config)
 		free(config->interface);
 		config->interface = NULL;
 	}
+	if (config->font != NULL) {
+		free(config->font);
+		config->font = NULL;
+	}
+	if (config->foreground != NULL) {
+		free(config->foreground);
+		config->foreground = NULL;
+	}
+	if (config->background != NULL) {
+		free(config->background);
+		config->background = NULL;
+	}
 }
 
 // Read configuration file and populate the Config structure
+static char *
+resolve_config_path(const char *override_path)
+{
+	char buffer[PATH_MAX];
+	const char *home;
+	int length;
+
+	if (override_path != NULL) {
+		return strdup(override_path);
+	}
+
+	home = getenv("HOME");
+	if (home != NULL && home[0] != '\0') {
+		length =
+		    snprintf(buffer, sizeof(buffer), "%s/.openbar.conf", home);
+		if (length > 0 && (size_t)length < sizeof(buffer) &&
+		    access(buffer, R_OK) == 0) {
+			return strdup(buffer);
+		}
+	}
+
+	return strdup("/etc/openbar.conf");
+}
+
 struct Config
-config_file()
+config_file(const char *config_file_path)
 {
 	struct Config config = {.logo = NULL,
 	    .interface = NULL,
+	    .font = NULL,
+	    .foreground = NULL,
+	    .background = NULL,
 	    .show_hostname = 0,
 	    .show_date = 0,
 	    .show_cpu = 0,
@@ -150,7 +194,15 @@ config_file()
 	    .show_net = 0,
 	    .show_vpn = 0};
 
-	const char *config_file_path = "/etc/openbar.conf";
+	config.font = strdup("fixed");
+	config.foreground = strdup("black");
+	config.background = strdup("white");
+	if (config.font == NULL || config.foreground == NULL ||
+	    config.background == NULL) {
+		perror("Failed to allocate memory for defaults");
+		exit(EXIT_FAILURE);
+	}
+
 	FILE *file = fopen(config_file_path, "r");
 	if (file == NULL) {
 		fprintf(stderr, "Error: Unable to open config file at %s\n",
@@ -212,6 +264,57 @@ config_file()
 
 	fclose(file);
 	return config;
+}
+
+static void
+set_config_string(char **dest, const char *value)
+{
+	char *dup;
+
+	if (value == NULL || *value == '\0')
+		return;
+
+	dup = strdup(value);
+	if (dup == NULL) {
+		perror("Failed to allocate memory for Xresources");
+		exit(EXIT_FAILURE);
+	}
+	free(*dest);
+	*dest = dup;
+}
+
+static void
+load_xresources(Display *display, struct Config *config)
+{
+	char *resource_string;
+	XrmDatabase db;
+	XrmValue value;
+	char *type;
+
+	XrmInitialize();
+	resource_string = XResourceManagerString(display);
+	if (resource_string == NULL)
+		return;
+
+	db = XrmGetStringDatabase(resource_string);
+	if (db == NULL)
+		return;
+
+	if (XrmGetResource(db, "openbar.font", "Openbar.Font", &type, &value) ==
+	    True) {
+		set_config_string(&config->font, value.addr);
+	}
+	if (XrmGetResource(db, "openbar.foreground", "Openbar.Foreground",
+	        &type, &value) == True) {
+		set_config_string(&config->foreground, value.addr);
+	}
+	if (XrmGetResource(db, "openbar.background", "Openbar.Background",
+	        &type, &value) == True) {
+		set_config_string(&config->background, value.addr);
+	}
+	(void)type;
+
+	XrmDestroyDatabase(db);
 }
 
 // Update public IP address by querying an external service
@@ -505,65 +608,78 @@ update_datetime()
 
 // Create an Xlib window for displaying the status bar
 void
-create_window(Display **display, Window *window, GC *gc, int *screen)
+create_window(Display *display, Window *window, GC *gc, int screen,
+    const struct Config *config)
 {
-	*display = XOpenDisplay(NULL);
-	if (*display == NULL) {
-		fprintf(stderr, "Cannot open display\n");
-		exit(1);
-	}
-	*screen = DefaultScreen(*display); // Initialize screen
-
-	int screen_width = DisplayWidth(*display, *screen);
+	int screen_width = DisplayWidth(display, screen);
 	int window_width = screen_width;
 	int window_height = 30; // Fixed height for the bar
 
-	*window = XCreateSimpleWindow(*display, RootWindow(*display, *screen),
-	    0, 0, window_width, window_height, 1, BlackPixel(*display, *screen),
-	    WhitePixel(*display, *screen));
+	*window = XCreateSimpleWindow(display, RootWindow(display, screen), 0,
+	    0, window_width, window_height, 1, BlackPixel(display, screen),
+	    WhitePixel(display, screen));
 
-	XSelectInput(*display, *window, ExposureMask | KeyPressMask);
-	XMapWindow(*display, *window);
+	XSelectInput(display, *window, ExposureMask | KeyPressMask);
+	XMapWindow(display, *window);
 
 	// Set window properties to make it unmanaged and always on top
-	Atom wm_state = XInternAtom(*display, "_NET_WM_STATE", False);
+	Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
 	Atom wm_state_above =
-	    XInternAtom(*display, "_NET_WM_STATE_ABOVE", False);
+	    XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
 	Atom wm_bypass_wm =
-	    XInternAtom(*display, "_NET_WM_BYPASS_COMPOSITOR", False);
+	    XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False);
 	Atom wm_state_skip_taskbar =
-	    XInternAtom(*display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+	    XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
 	Atom wm_state_skip_pager =
-	    XInternAtom(*display, "_NET_WM_STATE_SKIP_PAGER", False);
+	    XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
 	Atom wm_state_sticky =
-	    XInternAtom(*display, "_NET_WM_STATE_STICKY", False);
-	XMoveWindow(*display, *window, 0, 0);
+	    XInternAtom(display, "_NET_WM_STATE_STICKY", False);
+	XMoveWindow(display, *window, 0, 0);
 
 	Atom wm_state_atoms[] = {wm_state_above, wm_bypass_wm,
 	    wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky};
-	XChangeProperty(*display, *window, wm_state, XA_ATOM, 32,
+	XChangeProperty(display, *window, wm_state, XA_ATOM, 32,
 	    PropModeReplace, (unsigned char *)wm_state_atoms, 5);
 
-	*gc = XCreateGC(*display, *window, 0, NULL);
+	*gc = XCreateGC(display, *window, 0, NULL);
 	if (*gc == NULL) {
 		fprintf(stderr, "Cannot create graphics context\n");
 		exit(1);
 	}
 
 	// Load and set the font for the GC
-	XFontStruct *font_info = XLoadQueryFont(*display, "fixed");
+	XFontStruct *font_info = XLoadQueryFont(
+	    display, config->font != NULL ? config->font : "fixed");
 	if (!font_info) {
-		fprintf(stderr, "Error: Failed to load font 'fixed'\n");
-		XFreeGC(*display, *gc);
-		XCloseDisplay(*display);
+		font_info = XLoadQueryFont(display, "fixed");
+	}
+	if (!font_info) {
+		fprintf(stderr, "Error: Failed to load font\n");
+		XFreeGC(display, *gc);
+		XCloseDisplay(display);
 		exit(1);
 	}
-	XSetFont(*display, *gc, font_info->fid);
+	XSetFont(display, *gc, font_info->fid);
 
-	XSetForeground(*display, *gc, BlackPixel(*display, *screen));
-	XSetBackground(*display, *gc, WhitePixel(*display, *screen));
-	XClearWindow(*display, *window);
-	XMapRaised(*display, *window);
+	Colormap colormap = DefaultColormap(display, screen);
+	XColor fg, bg;
+	unsigned long fg_pixel = BlackPixel(display, screen);
+	unsigned long bg_pixel = WhitePixel(display, screen);
+
+	if (config->foreground != NULL &&
+	    XAllocNamedColor(display, colormap, config->foreground, &fg, &fg)) {
+		fg_pixel = fg.pixel;
+	}
+	if (config->background != NULL &&
+	    XAllocNamedColor(display, colormap, config->background, &bg, &bg)) {
+		bg_pixel = bg.pixel;
+	}
+
+	XSetForeground(display, *gc, fg_pixel);
+	XSetBackground(display, *gc, bg_pixel);
+	XSetWindowBackground(display, *window, bg_pixel);
+	XClearWindow(display, *window);
+	XMapRaised(display, *window);
 }
 
 // Draw text on the Xlib window
@@ -610,17 +726,77 @@ main(int argc, const char *argv[])
 	Window window;
 	GC gc;
 	int screen;
+	int opt;
+	int run_once = 0;
+	const char *config_override = NULL;
+	char *config_path;
 
-	// Create the Xlib window
-	create_window(&display, &window, &gc, &screen);
+	while ((opt = getopt(argc, (char *const *)argv, "1c:")) != -1) {
+		switch (opt) {
+		case '1':
+			run_once = 1;
+			break;
+		case 'c':
+			config_override = optarg;
+			break;
+		default:
+			fprintf(stderr, "Usage: openbar [-1] [-c path]\n");
+			return 1;
+		}
+	}
+
+	config_path = resolve_config_path(config_override);
+	if (config_path == NULL) {
+		perror("Failed to resolve config path");
+		return 1;
+	}
+
+	if (unveil(config_path, "r") == -1 || unveil("/etc/hosts", "r") == -1 ||
+	    unveil("/etc/resolv.conf", "r") == -1 ||
+	    unveil("/etc/services", "r") == -1 ||
+	    unveil("/tmp/.X11-unix", "rw") == -1) {
+		perror("unveil");
+		free(config_path);
+		return 1;
+	}
+
+	if (access("/dev/apm", R_OK) == 0 && unveil("/dev/apm", "r") == -1) {
+		perror("unveil");
+		free(config_path);
+		return 1;
+	}
+	if (unveil(NULL, NULL) == -1) {
+		perror("unveil");
+		free(config_path);
+		return 1;
+	}
+
+	if (pledge("stdio rpath inet dns unix sysctl ioctl", NULL) == -1) {
+		perror("pledge");
+		free(config_path);
+		return 1;
+	}
 
 	// Read the configuration file
-	struct Config config = config_file();
+	struct Config config = config_file(config_path);
+	free(config_path);
 	if (config.logo == NULL) {
 		fprintf(
 		    stderr, "Error: Unable to read logo from config file\n");
 		return 1;
 	}
+
+	display = XOpenDisplay(NULL);
+	if (display == NULL) {
+		fprintf(stderr, "Cannot open display\n");
+		return 1;
+	}
+	screen = DefaultScreen(display);
+
+	load_xresources(display, &config);
+
+	// Create the Xlib window
+	create_window(display, &window, &gc, screen, &config);
 
 	// Hide cursor in terminal
 	printf("\e[?25l");
@@ -726,7 +902,7 @@ main(int argc, const char *argv[])
 		ip_update_counter = (ip_update_counter + 1) % 10;
 
 		fflush(stdout);
-		if (argc == 2 && strcmp(argv[1], "-1") == 0) {
+		if (run_once) {
 			break;
 		}
 		usleep(2000000); // Sleep for 2 seconds

@@ -23,7 +23,13 @@ If the CPU has no sensors or is not supported, it will display an "x" next to th
 
 ## Usage
 
-`openbar` uses a configuration file that should be located in your home directory as `.openbar.conf` or `openbar.conf`. If these files are not found in your home directory, `openbar` will fall back to using the system-wide configuration file located at `/etc/openbar.conf`. You can find an example configuration file with all available options [here](openbar.conf):
+`openbar` loads configuration from, in order:
+
+1. A custom path provided with `-c`.
+2. `~/.openbar.conf` if it exists.
+3. The system-wide configuration file located at `/etc/openbar.conf`.
+
+You can find an example configuration file with all available options [here](openbar.conf):
 
 ```ini
 logo=OpenBar
@@ -41,6 +47,22 @@ vpn=yes
 The "logo" and "interface" options are configurable. "logo" will display any specified text, and "interface" is used to get the internal IP address of your machine.
 
 The other options are straightforward: set to "yes" to display the information on `openbar`, and "no" to hide it.
+
+## Xresources
+
+You can customize the font and colors using Xresources entries:
+
+```Xresources
+openbar.font: fixed
+openbar.foreground: black
+openbar.background: white
+```
+
+Defaults are `fixed`, `black`, and `white` if no entries are set.
+
+## Security
+
+`openbar` uses `pledge(2)` and `unveil(2)` on OpenBSD to limit filesystem and syscall access.
 
 ## Display
 
@@ -60,10 +82,6 @@ gap 30
 ## Building
 
 All necessary tools are included in your OpenBSD base installation except git. To clone the repository and build the project, use the following commands:
-
-```sh
-git clone https://github.com/daviduhden/openbar.git
-```
 
 ```sh
 git clone https://github.com/daviduhden/openbar.git
