@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2024 Gonzalo Rodriguez <gonzalo@x61.sh>
- * Copyright (c) 2024-2025 David Uhden Collado <david@uhden.dev>
+ * Copyright (c) 2024-2026 David David Uhden Collado <david@uhden.dev>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
