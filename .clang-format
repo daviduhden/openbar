@@ -1,6 +1,6 @@
 # .clang-format — OpenBSD KNF (style(9)) approximation
 
-# Copyright (c) 2025 David Uhden Collado <david@uhden.dev>
+# Copyright (c) 2025-2026 David Uhden Collado <david@uhden.dev>
 #
 # Permission to use, copy, modify, and distribute this configuration file for any
 # purpose with or without fee is hereby granted, provided that the above
