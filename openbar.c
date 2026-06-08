@@ -181,18 +181,18 @@ struct Config
 config_file(const char *config_file_path)
 {
 	struct Config config = {.logo = NULL,
-	    .interface = NULL,
-	    .font = NULL,
-	    .foreground = NULL,
-	    .background = NULL,
-	    .show_hostname = 0,
-	    .show_date = 0,
-	    .show_cpu = 0,
-	    .show_mem = 0,
-	    .show_bat = 0,
-	    .show_load = 0,
-	    .show_net = 0,
-	    .show_vpn = 0};
+		.interface = NULL,
+		.font = NULL,
+		.foreground = NULL,
+		.background = NULL,
+		.show_hostname = 0,
+		.show_date = 0,
+		.show_cpu = 0,
+		.show_mem = 0,
+		.show_bat = 0,
+		.show_load = 0,
+		.show_net = 0,
+		.show_vpn = 0};
 
 	config.font = strdup("fixed");
 	config.foreground = strdup("black");
@@ -305,11 +305,11 @@ load_xresources(Display *display, struct Config *config)
 		set_config_string(&config->font, value.addr);
 	}
 	if (XrmGetResource(db, "openbar.foreground", "Openbar.Foreground",
-	        &type, &value) == True) {
+	    &type, &value) == True) {
 		set_config_string(&config->foreground, value.addr);
 	}
 	if (XrmGetResource(db, "openbar.background", "Openbar.Background",
-	        &type, &value) == True) {
+	    &type, &value) == True) {
 		set_config_string(&config->background, value.addr);
 	}
 	(void)type;
@@ -351,7 +351,7 @@ update_public_ip()
 	}
 
 	const char *request = "GET /ip HTTP/1.1\r\nHost: "
-	                      "ifconfig.me\r\nConnection: close\r\n\r\n";
+	    "ifconfig.me\r\nConnection: close\r\n\r\n";
 	ssize_t total_sent = 0;
 	ssize_t request_len = strlen(request);
 	while (total_sent < request_len) {
@@ -369,7 +369,7 @@ update_public_ip()
 	ssize_t bytes_received;
 	size_t total_bytes_received = 0;
 	while ((bytes_received = recv(sockfd, buffer + total_bytes_received,
-	            sizeof(buffer) - 1 - total_bytes_received, 0)) > 0) {
+	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0) {
 		total_bytes_received += bytes_received;
 	}
 	if (bytes_received == -1) {
@@ -488,7 +488,7 @@ update_mem()
 	}
 
 	freemem = (unsigned long long)uvm_stats.free *
-	          (unsigned long long)uvm_stats.pagesize / (1024 * 1024);
+	    (unsigned long long)uvm_stats.pagesize / (1024 * 1024);
 
 	return freemem;
 }
@@ -554,7 +554,7 @@ update_cpu_temp()
 	if (temp_mib == -1) {
 		for (temp_mib = 0; temp_mib < 20; temp_mib++) {
 			int mib[5] = {CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP,
-			    0}; // acpitz0.temp0 (x395)
+				0}; // acpitz0.temp0 (x395)
 			if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1)
 				break;
 		}
@@ -637,7 +637,7 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	XMoveWindow(display, *window, 0, 0);
 
 	Atom wm_state_atoms[] = {wm_state_above, wm_bypass_wm,
-	    wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky};
+		wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky};
 	XChangeProperty(display, *window, wm_state, XA_ATOM, 32,
 	    PropModeReplace, (unsigned char *)wm_state_atoms, 5);
 
@@ -710,6 +710,7 @@ draw_text(Display *display, Window window, GC gc, const char *text)
 	// Flush the display to ensure all commands are sent
 	XFlush(display);
 }
+
 // Function declarations
 void draw_text(Display *display, Window window, GC gc, const char *text);
 void update_internal_ip(struct Config config);
