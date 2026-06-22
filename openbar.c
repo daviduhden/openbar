@@ -57,7 +57,8 @@
 #include <wchar.h>
 
 #define INET_ADDRSTRLEN 16
-#define MAX_IP_LENGTH 32
+#define INET6_ADDRSTRLEN 46
+#define MAX_IP_LENGTH 64
 #define MAX_LINE_LENGTH 256
 #define MAX_OUTPUT_LENGTH 16
 #define HOSTNAME_MAX_LENGTH 256
@@ -69,6 +70,7 @@ static char cpu_base_speed[32];
 static char cpu_avg_speed[32];
 static char datetime[32];
 static char public_ip[MAX_IP_LENGTH];
+static char public_ipv6[INET6_ADDRSTRLEN];
 static char internal_ip[INET_ADDRSTRLEN];
 static char vpn_status[16];
 double system_load[3];
@@ -387,6 +389,82 @@ update_public_ip()
 		public_ip[strcspn(public_ip, "\n")] = '\0';
 	} else {
 		strncpy(public_ip, "N/A", MAX_IP_LENGTH);
+	}
+
+	close(sockfd);
+	freeaddrinfo(res);
+}
+
+// Update public IPv6 address by querying an external service
+void
+update_public_ipv6()
+{
+	char buffer[1024];
+
+	struct addrinfo hints, *res;
+	int sockfd;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if (getaddrinfo("ifconfig.me", "http", &hints, &res) != 0 ||
+	    res == NULL) {
+		strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
+		return;
+	}
+
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sockfd == -1) {
+		freeaddrinfo(res);
+		strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
+		return;
+	}
+
+	if (connect(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
+		close(sockfd);
+		freeaddrinfo(res);
+		strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
+		return;
+	}
+
+	const char *request = "GET /ip HTTP/1.1\r\nHost: "
+	    "ifconfig.me\r\nConnection: close\r\n\r\n";
+	ssize_t total_sent = 0;
+	ssize_t request_len = strlen(request);
+	while (total_sent < request_len) {
+		ssize_t sent = send(
+		    sockfd, request + total_sent, request_len - total_sent, 0);
+		if (sent == -1) {
+			close(sockfd);
+			freeaddrinfo(res);
+			strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
+			return;
+		}
+		total_sent += sent;
+	}
+
+	ssize_t bytes_received;
+	size_t total_bytes_received = 0;
+	while ((bytes_received = recv(sockfd, buffer + total_bytes_received,
+	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0) {
+		total_bytes_received += bytes_received;
+	}
+	if (bytes_received == -1) {
+		close(sockfd);
+		freeaddrinfo(res);
+		strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
+		return;
+	}
+
+	buffer[total_bytes_received] = '\0';
+	char *ip_start = strstr(buffer, "\r\n\r\n");
+	if (ip_start != NULL) {
+		ip_start += 4; // Skip the "\r\n\r\n"
+		strncpy(public_ipv6, ip_start, sizeof(public_ipv6));
+		public_ipv6[strcspn(public_ipv6, "\n")] = '\0';
+	} else {
+		strncpy(public_ipv6, "N/A", sizeof(public_ipv6));
 	}
 
 	close(sockfd);
@@ -887,11 +965,13 @@ main(int argc, const char *argv[])
 		if (config.show_net) {
 			if (ip_update_counter == 0) {
 				update_public_ip();
+				update_public_ipv6();
 			}
 			update_internal_ip(config);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " IPs: %s ~ %s ",
-			    public_ip, internal_ip);
+			    sizeof(buffer) - strlen(buffer),
+			    " IPs: %s | %s ~ %s ", public_ip,
+			    public_ipv6, internal_ip);
 		}
 
 		// Draw the buffer text on the Xlib window
