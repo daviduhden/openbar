@@ -1,97 +1,76 @@
-.TH OPENBAR.CONF 5 "July 2026" "OpenBar 1.0" "File Formats"
-.SH NAME
-openbar.conf \- configuration file for openbar
-
-.SH DESCRIPTION
-.B openbar.conf
-is the configuration file for 
-.B openbar,
-a status bar application for cwm and other window managers. This file allows the user to specify various options to control what information is displayed by 
-.B openbar.
-
-The configuration file can be located in the user's home directory as
-.B ~/.openbar.conf
-or in the global directory as
-.B /etc/openbar.conf.
-
-If both files are present, the file in the user's home directory will take precedence.
-
-.SH SYNTAX
-The configuration file consists of key-value pairs, one per line. The following options are available:
-
-.TP
-.B logo
-Specifies the logo or name to be displayed. Example:
-.EX
-logo=OpenBar
-.EE
-
-.TP
-.B date
-Specifies whether to display the current date and time. Example:
-.EX
-date=yes
-.EE
-
-.TP
-.B cpu
-Specifies whether to display the CPU speed and temperature. Example:
-.EX
-cpu=yes
-.EE
-
-.TP
-.B bat
-Specifies whether to display the battery status. Example:
-.EX
-bat=yes
-.EE
-
-.TP
-.B mem
-Specifies whether to display the free memory. Example:
-.EX
-mem=yes
-.EE
-
-.TP
-.B load
-Specifies whether to display the load average. Example:
-.EX
-load=yes
-.EE
-
-.TP
-.B net
-Specifies whether to display the public and private IP addresses. Example:
-.EX
-net=yes
-.EE
-
-.TP
-.B hostname
-Specifies whether to display the hostname. Example:
-.EX
-hostname=yes
-.EE
-
-.TP
-.B interface
-Specifies the network interface to use for retrieving the internal IP address. Example:
-.EX
-interface=iwm0
-.EE
-
-.TP
-.B vpn
-Specifies whether to display the VPN connection status. Example:
-.EX
-vpn=yes
-.EE
-
-.SH EXAMPLE
-An example configuration file is shown below:
-.EX
+.Dd $Mdocdate: August 1 2026$
+.Dt OPENBAR.CONF 5
+.Os
+.Sh NAME
+.Nm openbar.conf
+.Nd configuration file for openbar
+.Sh DESCRIPTION
+.Nm
+is the configuration file for
+.Xr openbar 1 .
+It controls which system information is displayed on the
+status bar.
+.Pp
+The file may be placed at
+.Pa ~/.openbar.conf
+.Pq per-user
+or
+.Pa /etc/openbar.conf
+.Pq system-wide .
+If both exist the per-user file takes precedence.
+.Pp
+A custom path may be specified with the
+.Fl c
+option of
+.Xr openbar 1 .
+.Sh SYNTAX
+Each line is a
+.Ar key Ns = Ns Ar value
+pair.
+Boolean features accept
+.Dq yes
+or
+.Dq no .
+.Bl -tag -width Ds
+.It Ar logo
+Displayed text or name.
+Example:
+.Dl logo=OpenBar
+.It Ar date
+Display the current date and time.
+.It Ar cpu
+Display CPU speed and temperature.
+.It Ar bat
+Display battery status and percentage.
+.It Ar mem
+Display free memory in MB.
+.It Ar load
+Display the 1-minute load average.
+.It Ar net
+Display public and private IP addresses.
+Public addresses are fetched from
+.Pa ifconfig.me
+by a sandboxed network worker process.
+.It Ar hostname
+Display the system hostname.
+.It Ar interface
+Network interface used to obtain the internal IP address.
+Example:
+.Dl interface=iwm0
+.It Ar vpn
+Display whether a WireGuard
+.Pq wg
+interface is active.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa ~/.openbar.conf
+Per-user configuration.
+.It Pa /etc/openbar.conf
+System-wide configuration.
+.El
+.Sh EXAMPLES
+.Bd -literal -offset indent
 logo=openbar
 date=yes
 cpu=yes
@@ -102,27 +81,58 @@ net=yes
 hostname=yes
 interface=iwm0
 vpn=yes
-.EE
-
-.SH FILES
-.B ~/.openbar.conf
-.RS 4
-User-specific configuration file for 
-.B openbar.
-.RE
-.B /etc/openbar.conf
-.RS 4
-Global configuration file for 
-.B openbar.
-.RE
-
-.SH SEE ALSO
-.BR openbar (1),
-.BR cwm (1),
-.BR tmux (1)
-
-.SH AUTHORS
-Gonzalo Rodriguez
-.RI (gonzalo@x61.sh)
-David Uhden Collado
-.RI (david@uhden.dev)
+.Ed
+.Sh SECURITY
+The enabled features directly affect the
+.Xr pledge 2
+promise set retained by the main process during
+steady-state operation.
+Enabling
+.Ar bat
+adds
+.Dq rpath ioctl
+.Po for
+.Pa /dev/apm
+.Pc ,
+.Ar cpu
+or
+.Ar mem
+adds
+.Dq sysctl ,
+and
+.Ar vpn
+or
+.Ar net
+adds
+.Dq route
+.Po for
+.Xr getifaddrs 3
+.Pc .
+Disabling unneeded features reduces the authority available
+to a compromised main process.
+.Pp
+The network worker is always forked when
+.Ar net
+is enabled and runs under an independent sandbox with
+.Dq stdio inet dns
+and filesystem visibility limited to DNS resolution
+files.
+.Pp
+The configuration file path must be unveiled before
+the
+.Xr unveil 2
+lock; late access to undeclared paths is rejected with a
+diagnostic.
+All paths listed here require runtime verification
+on a real
+.Ox
+system.
+.Sh SEE ALSO
+.Xr openbar 1 ,
+.Xr pledge 2 ,
+.Xr unveil 2
+.Sh AUTHORS
+.An Gonzalo Rodriguez
+.Aq Mt gonzalo@x61.sh
+.An David Uhden Collado
+.Aq Mt david@uhden.dev

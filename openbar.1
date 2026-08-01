@@ -1,99 +1,207 @@
-.TH OPENBAR 1 "July 2026" "OpenBar 1.0" "General Commands"
-.SH NAME
-openbar \- status bar for cwm and other window managers
-
-.SH DESCRIPTION
-.B openbar
-is a status bar application designed for the cwm window manager, but it can also be used with other window managers. It displays various system information including CPU speed and temperature, memory usage, window ID, load average, battery status, public and private IP addresses, and VPN connection status.
-
-.SH OPTIONS
-.TP
-.B -1
+.Dd $Mdocdate: August 1 2026$
+.Dt OPENBAR 1
+.Os
+.Sh NAME
+.Nm openbar
+.Nd status bar for X11 window managers
+.Sh SYNOPSIS
+.Nm
+.Op Fl 1
+.Op Fl c Ar path
+.Sh DESCRIPTION
+.Nm
+is a status bar designed for
+.Xr cwm 1
+and other X11 window managers.
+It displays system information including CPU speed and temperature,
+free memory, load average, battery status, public and private
+IP addresses, and VPN connection status.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl 1
 Run one update cycle and exit.
-
-.TP
-.B -c
-Use a custom configuration file path.
-
+.It Fl c Ar path
+Use the configuration file at
+.Ar path
+instead of the default.
+.El
+.Pp
 Configuration is loaded from, in order:
-.IP \(bu 2
+.Bl -bullet
+.It
 the file passed with
-.B -c
-.IP \(bu 2
-.B ~/.openbar.conf
+.Fl c
+.It
+.Pa ~/.openbar.conf
 if it exists
-.IP \(bu 2
-.B /etc/openbar.conf
-
-.SH CONFIGURATION
-The configuration for 
-.B openbar
-is specified in the configuration file. See the 
-.B openbar.conf(5)
-manual page for more details.
-
-.SH XRESOURCES
-You can customize font and colors using Xresources entries:
-.RS 4
-.nf
+.It
+.Pa /etc/openbar.conf
+.El
+.Sh PROCESS ARCHITECTURE
+.Nm
+runs as two processes on
+.Ox :
+.Bl -tag -width Ds
+.It Main process
+Reads configuration, manages the X11 window, and queries
+kernel interfaces for CPU, memory, load, battery, and
+network interface statistics.
+.It Network worker
+A child process forked before sandboxing.
+It fetches public IPv4 and IPv6 addresses from
+.Pa ifconfig.me
+over HTTP and returns validated results to the main
+process through a bounded
+.Xr socketpair 2
+protocol.
+The worker has no access to X11, the configuration file,
+battery or sensor devices, or any other parent resource.
+.El
+.Sh XRESOURCES
+Font and colors can be customized with Xresources entries:
+.Bd -literal -offset indent
 openbar.font: fixed
 openbar.foreground: black
 openbar.background: white
-.fi
-.RE
-If not set, defaults are 
-.B fixed,
-.B black,
+.Ed
+.Pp
+Defaults are
+.Dq fixed ,
+.Dq black ,
 and
-.B white.
-
-.SH USAGE
-To display 
-.B openbar
-in your window manager, add the following line to your 
-.B .xsession
-file:
-.EX
-exec openbar
-.EE
-
-For 
-.B cwm,
-you might want to leave a gap at the top of the screen by adding the following to your 
-.B .cwmrc
-file:
-.EX
-gap 30
-.EE
-
-.SH FILES
-.B ~/.openbar.conf
-.RS 4
-User-specific configuration file for
-.B openbar.
-.RE
-.B /etc/openbar.conf
-.RS 4
-Global configuration file for 
-.B openbar.
-.RE
-
-.SH SECURITY
-.B openbar
-uses
-.BR pledge (2)
+.Dq white .
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa ~/.openbar.conf
+Per-user configuration.
+.It Pa /etc/openbar.conf
+System-wide configuration.
+.El
+.Sh SECURITY
+.Ss Sandboxing
+Both processes use
+.Xr pledge 2
 and
-.BR unveil (2)
-to limit filesystem access and permitted syscalls on OpenBSD.
-
-.SH SEE ALSO
-.BR cwm (1),
-.BR tmux (1),
-.BR curl (1),
-.BR openbar.conf (5)
-
-.SH AUTHORS
-Gonzalo Rodriguez
-.RI (gonzalo@x61.sh)
-David Uhden Collado
-.RI (david@uhden.dev)
+.Xr unveil 2
+on
+.Ox
+to limit permitted system calls and filesystem visibility.
+.Ss Main process
+Filesystem visibility is locked to:
+.Bl -bullet -compact
+.It
+the configuration file (read-only)
+.It
+.Pa /tmp/.X11-unix
+.Pq read-write, X11 socket
+.It
+.Pa /dev/apm
+.Pq read-only, only if the device node exists
+.El
+.Pp
+The steady-state
+.Xr pledge 2
+set is derived from the enabled configuration options:
+.Bl -tag -width Ds
+.It Dq stdio unix
+Always required for basic I/O and X11.
+.It Dq sysctl
+Added when
+.Ar cpu
+or
+.Ar mem
+is enabled.
+.It Dq rpath ioctl
+Added when
+.Ar bat
+is enabled
+.Po access to
+.Pa /dev/apm
+.Pc .
+.It Dq route
+Added when
+.Ar vpn
+or
+.Ar net
+is enabled
+.Po
+.Xr getifaddrs 3
+.Pc .
+.El
+.Pp
+The init pledge
+.Dq stdio rpath unix
+is reduced to the steady-state set after reading the
+configuration file and creating the X11 window.
+.Nm
+never retains
+.Dq inet ,
+.Dq dns ,
+or
+.Dq exec
+in the main process.
+.Ss Network worker
+The worker runs under
+.Dq stdio inet dns
+with filesystem visibility locked to
+.Pa /etc/hosts ,
+.Pa /etc/resolv.conf ,
+and
+.Pa /etc/services
+.Pq all read-only .
+It has no access to the X11 display, system configuration,
+battery device, or any kernel interface.
+A compromised worker cannot reach the main process memory,
+spawn processes, or access the filesystem beyond DNS
+resolution helpers.
+.Ss IPC protocol
+Communication between parent and child uses a fixed-size
+message structure over
+.Xr socketpair 2 .
+The parent sends a one-byte fetch command; the child
+responds with a bounded 112-byte response containing
+status codes and the address strings.
+Unknown message types are ignored; truncated or oversized
+responses cause the parent to fall back to
+.Dq N/A .
+.Ss Descriptor isolation
+The child closes its standard input, standard output, and
+the parent's socketpair endpoint immediately after
+.Xr fork 2 .
+The parent closes the child's socketpair endpoint.
+No file descriptors cross the
+.Xr exec 3
+boundary
+.Pq the child never calls exec .
+.Ss Privilege dropping
+.Nm
+runs as the invoking user; no setuid, privilege escalation,
+or
+.Xr chroot 2
+is performed.
+All sandbox restrictions are applied in the child before
+any network I/O, and in the parent before the main event
+loop.
+.Ss Limitations
+All
+.Xr pledge 2
+promises and
+.Xr unveil 2
+paths documented above require runtime verification
+through
+.Xr ktrace 1 ,
+regression tests, and realistic workloads on a real
+.Ox
+system.
+None of the policies have been verified through execution tracing.
+.Sh SEE ALSO
+.Xr cwm 1 ,
+.Xr pledge 2 ,
+.Xr unveil 2 ,
+.Xr openbar.conf 5
+.Sh AUTHORS
+.An Gonzalo Rodriguez
+.Aq Mt gonzalo@x61.sh
+.An David Uhden Collado
+.Aq Mt david@uhden.dev
