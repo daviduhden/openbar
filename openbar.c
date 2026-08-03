@@ -28,11 +28,13 @@
  */
 
 #include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
+#include <stdint.h>
 #include <sys/sensors.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
-#include <sys/time.h>
-#include <sys/types.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -43,6 +45,7 @@
 #include <X11/Xutil.h>
 #include <arpa/inet.h>
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
 #include <limits.h>
@@ -839,6 +842,8 @@ draw_text(Display *display, Window window, GC gc, const char *text)
 	    (int)strlen(text));
 	XFlush(display);
 }
+
+static int validate_ip(const char *);
 
 /*
  * net_fetch – request IP data from the network worker.
