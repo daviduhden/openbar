@@ -1,5 +1,5 @@
 # Compiler and flags
-CC?= cc
+CC ?= cc
 LIBS = -L/usr/X11R6/lib -lX11
 OPTFLAGS = -O3
 DBGFLAGS = -O0 -g

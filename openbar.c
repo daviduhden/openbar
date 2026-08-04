@@ -219,7 +219,7 @@ resolve_config_path(const char *override_path)
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0') {
 		length = snprintf(buffer, sizeof(buffer), "%s/.openbar.conf",
-			 home);
+		    home);
 		if (length > 0 && (size_t)length < sizeof(buffer) &&
 		    access(buffer, R_OK) == 0)
 			return strdup(buffer);
@@ -406,8 +406,8 @@ update_public_ip(void)
 	ssize_t	bytes_received;
 	size_t	total_bytes_received = 0;
 	while ((bytes_received = recv(sockfd,
-	       buffer + total_bytes_received,
-	       sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
+	    buffer + total_bytes_received,
+	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
 		total_bytes_received += (size_t)bytes_received;
 	if (bytes_received == -1) {
 		close(sockfd);
@@ -484,8 +484,8 @@ update_public_ipv6(void)
 	ssize_t	bytes_received;
 	size_t	total_bytes_received = 0;
 	while ((bytes_received = recv(sockfd,
-	       buffer + total_bytes_received,
-	       sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
+	    buffer + total_bytes_received,
+	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
 		total_bytes_received += (size_t)bytes_received;
 	if (bytes_received == -1) {
 		close(sockfd);
@@ -755,8 +755,8 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	int window_height = 30;
 
 	*window = XCreateSimpleWindow(display, RootWindow(display, screen), 0,
-		  0, window_width, window_height, 1,
-		  BlackPixel(display, screen), WhitePixel(display, screen));
+	    0, window_width, window_height, 1,
+	    BlackPixel(display, screen), WhitePixel(display, screen));
 
 	XSelectInput(display, *window, ExposureMask | KeyPressMask);
 	XMapWindow(display, *window);
