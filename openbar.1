@@ -3,7 +3,7 @@
 .Os
 .Sh NAME
 .Nm openbar
-.Nd status bar for X11 window managers
+.Nd lightweight status bar for cwm and other X11 window managers
 .Sh SYNOPSIS
 .Nm
 .Op Fl 1
@@ -16,6 +16,11 @@ and other X11 window managers.
 It displays system information including CPU speed and temperature,
 free memory, load average, battery status, public and private
 IP addresses, and VPN connection status.
+.Pp
+Its visual style, colour palette and configuration syntax are
+modelled after
+.Xr cwm 1
+so that the bar blends in as if it were part of the window manager.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
@@ -33,10 +38,10 @@ Configuration is loaded from, in order:
 the file passed with
 .Fl c
 .It
-.Pa ~/.openbar.conf
+.Pa ~/.openbarrc
 if it exists
 .It
-.Pa /etc/openbar.conf
+.Pa /etc/openbarrc
 .El
 .Sh PROCESS ARCHITECTURE
 .Nm
@@ -59,24 +64,11 @@ protocol.
 The worker has no access to X11, the configuration file,
 battery or sensor devices, or any other parent resource.
 .El
-.Sh XRESOURCES
-Font and colors can be customized with Xresources entries:
-.Bd -literal -offset indent
-openbar.font: fixed
-openbar.foreground: black
-openbar.background: white
-.Ed
-.Pp
-Defaults are
-.Dq fixed ,
-.Dq black ,
-and
-.Dq white .
 .Sh FILES
 .Bl -tag -width Ds
-.It Pa ~/.openbar.conf
+.It Pa ~/.openbarrc
 Per-user configuration.
-.It Pa /etc/openbar.conf
+.It Pa /etc/openbarrc
 System-wide configuration.
 .El
 .Sh SECURITY
@@ -127,18 +119,6 @@ uses
 .Dv NET_RT_IFLIST .
 .El
 .Pp
-Configuration and X11 initialization occur before a single, reducing
-.Xr pledge 2
-call; a later call cannot add promises.
-The CPU MHz selector is read once before pledge, while
-.Dv HW_SENSORS
-is always permitted.
-There are no generic
-.Dq sysctl
-or
-.Dq ioctl
-promises.
-.Pp
 No pledge promise permits repeated
 .Dv APM_IOC_GETPOWER
 operations.
@@ -156,11 +136,6 @@ with filesystem visibility locked to
 and
 .Pa /etc/protocols
 .Pq all read-only .
-It has no access to the X11 display, system configuration,
-battery device, or any kernel interface.
-A compromised worker cannot reach the main process memory,
-spawn processes, or access the filesystem beyond DNS
-resolution helpers.
 .Ss IPC protocol
 Communication between parent and child uses a fixed-size
 message structure over
@@ -168,9 +143,6 @@ message structure over
 The parent sends a one-byte fetch command; the child
 responds with a bounded 112-byte response containing
 status codes and the address strings.
-Unknown message types are ignored; truncated or oversized
-responses cause the parent to fall back to
-.Dq N/A .
 .Ss Descriptor isolation
 The child closes its standard input, standard output, and
 the parent's socketpair endpoint immediately after
@@ -186,24 +158,17 @@ runs as the invoking user; no setuid, privilege escalation,
 or
 .Xr chroot 2
 is performed.
-All sandbox restrictions are applied in the child before
-any network I/O, and in the parent before the main event
-loop.
 .Ss Limitations
 Public addresses are obtained over unencrypted HTTP and are informational.
 The response is bounded and parsed with
 .Xr inet_pton 3
 before display.
-The policies have been checked statically against the current
-.Ox
-manuals and source, but still require runtime regression testing on real
-hardware.
 .Sh SEE ALSO
 .Xr cwm 1 ,
 .Xr pledge 2 ,
 .Xr unveil 2 ,
 .Xr apm 4 ,
-.Xr openbar.conf 5 ,
+.Xr openbarrc 5 ,
 .Xr X 7
 .Sh AUTHORS
 .An Gonzalo Rodriguez

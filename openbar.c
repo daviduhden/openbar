@@ -40,8 +40,8 @@
 #include <netinet/in.h>
 
 #include <X11/Xatom.h>
+#include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
-#include <X11/Xresource.h>
 #include <X11/Xutil.h>
 #include <arpa/inet.h>
 #include <err.h>
@@ -59,7 +59,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <wchar.h>
 
 #define INET_ADDRSTRLEN		16
 #define INET6_ADDRSTRLEN	46
@@ -68,28 +67,15 @@
 #define MAX_OUTPUT_LENGTH	16
 #define HOSTNAME_MAX_LENGTH	256
 
-/*
- * IPC protocol between the main (display) process and the network worker.
- *
- * The parent sends a one-byte command: IPC_CMD_FETCH.
- * The child responds with a fixed-size message: struct net_response.
- *
- * All fields use fixed-width types.  No raw pointers or native
- * structs with padding cross the boundary.
- */
 #define IPC_CMD_FETCH	0x01
 
 struct net_response {
-	uint8_t		status_v4;	/* 0 = success */
+	uint8_t		status_v4;
 	uint8_t		status_v6;
 	char		addr_v4[MAX_IP_LENGTH];
 	char		addr_v6[INET6_ADDRSTRLEN];
 };
 
-/*
- * Network‑worker error codes (sent in status_v4 or status_v6).
- * 0 means the corresponding address was fetched successfully.
- */
 #define NET_OK		  0
 #define NET_ERR_DNS	  1
 #define NET_ERR_CONNECT	  2
@@ -108,12 +94,25 @@ static char		vpn_status[16];
 double			system_load[3];
 unsigned long long	free_memory;
 
+enum color_slot {
+	BAR_FG,
+	BAR_BG,
+	BAR_URGENT,
+	COLOR_NITEMS
+};
+
+struct gap {
+	int	 top;
+	int	 bottom;
+	int	 left;
+	int	 right;
+};
+
 struct Config {
 	char		*logo;
 	char		*interface;
-	char		*font;
-	char		*foreground;
-	char		*background;
+	char		*fontname;
+	char		*color[COLOR_NITEMS];
 	int		 show_hostname;
 	int		 show_date;
 	int		 show_cpu;
@@ -122,9 +121,81 @@ struct Config {
 	int		 show_load;
 	int		 show_net;
 	int		 show_vpn;
+	int		 barheight;
+	struct gap	 gap;
 };
 
-static void set_config_string(char **, const char *);
+static const char *color_defaults[] = {
+	"#000000",		/* BAR_FG */
+	"#CCCCCC",		/* BAR_BG */
+	"#FC8814",		/* BAR_URGENT */
+};
+
+static void	*xmalloc(size_t);
+static void	*xcalloc(size_t, size_t);
+static char	*xstrdup(const char *);
+static void	 config_free(struct Config *);
+static void	 config_setstr(char **, const char *);
+
+static void *
+xmalloc(size_t siz)
+{
+	void	*p;
+
+	if (siz == 0)
+		errx(1, "xmalloc: zero size");
+	if ((p = malloc(siz)) == NULL)
+		err(1, "malloc");
+	return p;
+}
+
+static void *
+xcalloc(size_t no, size_t siz)
+{
+	void	*p;
+
+	if (siz == 0 || no == 0)
+		errx(1, "xcalloc: zero size");
+	if (SIZE_MAX / no < siz)
+		errx(1, "xcalloc: no * siz > SIZE_MAX");
+	if ((p = calloc(no, siz)) == NULL)
+		err(1, "calloc");
+	return p;
+}
+
+static char *
+xstrdup(const char *str)
+{
+	char	*p;
+
+	if ((p = strdup(str)) == NULL)
+		err(1, "strdup");
+	return p;
+}
+
+static void
+config_setstr(char **dest, const char *value)
+{
+	free(*dest);
+	*dest = xstrdup(value);
+}
+
+static void
+config_free(struct Config *c)
+{
+	unsigned int	i;
+
+	free(c->logo);
+	c->logo = NULL;
+	free(c->interface);
+	c->interface = NULL;
+	free(c->fontname);
+	c->fontname = NULL;
+	for (i = 0; i < COLOR_NITEMS; i++) {
+		free(c->color[i]);
+		c->color[i] = NULL;
+	}
+}
 
 static ssize_t
 xread(int fd, void *buf, size_t n)
@@ -181,21 +252,6 @@ trim(char *value)
 	return value;
 }
 
-void
-free_config(struct Config *config)
-{
-	free(config->logo);
-	config->logo = NULL;
-	free(config->interface);
-	config->interface = NULL;
-	free(config->font);
-	config->font = NULL;
-	free(config->foreground);
-	config->foreground = NULL;
-	free(config->background);
-	config->background = NULL;
-}
-
 static char *
 resolve_config_path(const char *override_path)
 {
@@ -204,160 +260,196 @@ resolve_config_path(const char *override_path)
 	int		 length;
 
 	if (override_path != NULL)
-		return strdup(override_path);
+		return xstrdup(override_path);
 
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0') {
-		length = snprintf(buffer, sizeof(buffer), "%s/.openbar.conf",
-		    home);
+		length = snprintf(buffer, sizeof(buffer),
+		    "%s/.openbarrc", home);
 		if (length > 0 && (size_t)length < sizeof(buffer) &&
 		    access(buffer, R_OK) == 0)
-			return strdup(buffer);
+			return xstrdup(buffer);
 	}
 
-	return strdup("/etc/openbar.conf");
+	return xstrdup("/etc/openbarrc");
 }
 
 struct Config
-config_file(const char *config_file_path)
+config_load(const char *config_file_path)
 {
-	struct Config config = {
-		.logo		= NULL,
-		.interface	= NULL,
-		.font		= NULL,
-		.foreground	= NULL,
-		.background	= NULL,
-		.show_hostname	= 0,
-		.show_date	= 0,
-		.show_cpu	= 0,
-		.show_mem	= 0,
-		.show_bat	= 0,
-		.show_load	= 0,
-		.show_net	= 0,
-		.show_vpn	= 0,
-	};
+	struct Config	 config;
+	FILE		*file = NULL;
+	char		 line[MAX_LINE_LENGTH];
+	unsigned int	 i;
 
-	config.font = strdup("fixed");
-	config.foreground = strdup("black");
-	config.background = strdup("white");
-	if (config.font == NULL || config.foreground == NULL ||
-	    config.background == NULL) {
-		perror("Failed to allocate memory for defaults");
-		exit(EXIT_FAILURE);
+	memset(&config, 0, sizeof(config));
+	config.barheight = 24;
+	config.gap.top = 0;
+	config.gap.bottom = 0;
+	config.gap.left = 0;
+	config.gap.right = 0;
+
+	config.fontname = xstrdup("sans-serif:pixelsize=14:bold");
+	for (i = 0; i < COLOR_NITEMS; i++)
+		config.color[i] = xstrdup(color_defaults[i]);
+
+	file = fopen(config_file_path, "r");
+	if (file == NULL) {
+		warn("Unable to open config file at %s",
+		    config_file_path);
+		goto fail;
 	}
 
-	FILE *file = fopen(config_file_path, "r");
-	if (file == NULL)
-		err(EXIT_FAILURE, "Unable to open config file at %s",
-		    config_file_path);
-
-	char line[MAX_LINE_LENGTH];
-
 	while (fgets(line, sizeof(line), file)) {
-		char *key, *value, *separator;
+		char *keyword, *argument;
 
-		if (strchr(line, '\n') == NULL && !feof(file))
-			errx(EXIT_FAILURE, "Configuration line is too long");
+		if (strchr(line, '\n') == NULL && !feof(file)) {
+			warnx("Configuration line is too long");
+			goto fail;
+		}
 		line[strcspn(line, "\n")] = '\0';
-		key = trim(line);
-		if (*key == '\0' || *key == '#')
+		keyword = trim(line);
+		if (*keyword == '\0' || *keyword == '#')
 			continue;
-		separator = strchr(key, '=');
-		if (separator == NULL) {
-			warnx("Ignoring malformed configuration line: %s", key);
+
+		argument = strchr(keyword, ' ');
+		if (argument != NULL) {
+			*argument = '\0';
+			argument = trim(argument + 1);
+		}
+
+		if (argument == NULL || *argument == '\0') {
+			warnx("Missing argument for %s", keyword);
 			continue;
 		}
-		*separator = '\0';
-		value = trim(separator + 1);
-		key = trim(key);
 
-		if (strcmp(key, "logo") == 0)
-			set_config_string(&config.logo, value);
-		else if (strcmp(key, "interface") == 0)
-			set_config_string(&config.interface, value);
-		else {
+		if (argument[0] == '"' || argument[0] == '\'') {
+			char  quote = argument[0];
+			char *end = strrchr(argument + 1, quote);
+			if (end != NULL) {
+				argument++;
+				*end = '\0';
+			}
+		}
+
+		if (strcmp(keyword, "logo") == 0)
+			config_setstr(&config.logo, argument);
+		else if (strcmp(keyword, "interface") == 0)
+			config_setstr(&config.interface, argument);
+		else if (strcmp(keyword, "fontname") == 0)
+			config_setstr(&config.fontname, argument);
+		else if (strcmp(keyword, "barheight") == 0) {
+			const char *errstr;
+			int v = (int)strtonum(argument, 12, 60, &errstr);
+			if (errstr != NULL) {
+				warnx("Invalid barheight: %s", argument);
+				goto fail;
+			}
+			config.barheight = v;
+		} else if (strcmp(keyword, "gap") == 0) {
+			const char *errstr;
+			char *token, *saveptr;
+			int gaps[4], n;
+			n = 0;
+			for (token = strtok_r(argument, " \t", &saveptr);
+			    token != NULL && n < 4;
+			    token = strtok_r(NULL, " \t", &saveptr)) {
+				gaps[n] = (int)strtonum(token, 0, INT_MAX,
+				    &errstr);
+				if (errstr != NULL) {
+					warnx("Invalid gap value");
+					goto fail;
+				}
+				n++;
+			}
+			if (n == 4) {
+				config.gap.top = gaps[0];
+				config.gap.bottom = gaps[1];
+				config.gap.left = gaps[2];
+				config.gap.right = gaps[3];
+			} else
+				warnx("gap requires four values");
+		} else if (strcmp(keyword, "color") == 0) {
+			char *space, *slot, *val;
+
+			space = strchr(argument, ' ');
+			if (space == NULL)
+				space = strchr(argument, '\t');
+			if (space != NULL) {
+				*space = '\0';
+				slot = argument;
+				val = trim(space + 1);
+				if (strcmp(slot, "barfg") == 0)
+					config_setstr(&config.color[BAR_FG],
+					    val);
+				else if (strcmp(slot, "barbg") == 0)
+					config_setstr(&config.color[BAR_BG],
+					    val);
+				else if (strcmp(slot, "urgent") == 0)
+					config_setstr(&config.color[BAR_URGENT],
+					    val);
+				else
+					warnx("Unknown color slot: %s", slot);
+			}
+		} else if (strcmp(keyword, "show") == 0) {
 			int *setting = NULL;
-
-			if (strcmp(key, "date") == 0)
-				setting = &config.show_date;
-			else if (strcmp(key, "cpu") == 0)
-				setting = &config.show_cpu;
-			else if (strcmp(key, "load") == 0)
-				setting = &config.show_load;
-			else if (strcmp(key, "bat") == 0)
-				setting = &config.show_bat;
-			else if (strcmp(key, "net") == 0)
-				setting = &config.show_net;
-			else if (strcmp(key, "mem") == 0)
-				setting = &config.show_mem;
-			else if (strcmp(key, "hostname") == 0)
+			if (strcmp(argument, "hostname") == 0)
 				setting = &config.show_hostname;
-			else if (strcmp(key, "vpn") == 0)
+			else if (strcmp(argument, "date") == 0)
+				setting = &config.show_date;
+			else if (strcmp(argument, "cpu") == 0)
+				setting = &config.show_cpu;
+			else if (strcmp(argument, "mem") == 0)
+				setting = &config.show_mem;
+			else if (strcmp(argument, "bat") == 0)
+				setting = &config.show_bat;
+			else if (strcmp(argument, "load") == 0)
+				setting = &config.show_load;
+			else if (strcmp(argument, "net") == 0)
+				setting = &config.show_net;
+			else if (strcmp(argument, "vpn") == 0)
 				setting = &config.show_vpn;
-
-			if (setting == NULL)
-				warnx("Ignoring unknown configuration key: %s",
-				    key);
-			else if (strcmp(value, "yes") == 0)
-				*setting = 1;
-			else if (strcmp(value, "no") == 0)
-				*setting = 0;
-			else
-				errx(EXIT_FAILURE,
-				    "%s must be either yes or no", key);
-		}
+			else {
+				warnx("Unknown show keyword: %s", argument);
+				continue;
+			}
+			*setting = 1;
+		} else if (strcmp(keyword, "hide") == 0) {
+			int *setting = NULL;
+			if (strcmp(argument, "hostname") == 0)
+				setting = &config.show_hostname;
+			else if (strcmp(argument, "date") == 0)
+				setting = &config.show_date;
+			else if (strcmp(argument, "cpu") == 0)
+				setting = &config.show_cpu;
+			else if (strcmp(argument, "mem") == 0)
+				setting = &config.show_mem;
+			else if (strcmp(argument, "bat") == 0)
+				setting = &config.show_bat;
+			else if (strcmp(argument, "load") == 0)
+				setting = &config.show_load;
+			else if (strcmp(argument, "net") == 0)
+				setting = &config.show_net;
+			else if (strcmp(argument, "vpn") == 0)
+				setting = &config.show_vpn;
+			else {
+				warnx("Unknown hide keyword: %s", argument);
+				continue;
+			}
+			*setting = 0;
+		} else
+			warnx("Ignoring unknown configuration keyword: %s",
+			    keyword);
 	}
 
 	fclose(file);
 	return config;
-}
 
-static void
-set_config_string(char **dest, const char *value)
-{
-	char *dup;
-
-	if (value == NULL || *value == '\0')
-		return;
-
-	dup = strdup(value);
-	if (dup == NULL) {
-		perror("Failed to allocate memory for Xresources");
-		exit(EXIT_FAILURE);
-	}
-	free(*dest);
-	*dest = dup;
-}
-
-static void
-load_xresources(Display *display, struct Config *config)
-{
-	char		*resource_string;
-	XrmDatabase	 db;
-	XrmValue	 value;
-	char		*type;
-
-	XrmInitialize();
-	resource_string = XResourceManagerString(display);
-	if (resource_string == NULL)
-		return;
-
-	db = XrmGetStringDatabase(resource_string);
-	if (db == NULL)
-		return;
-
-	if (XrmGetResource(db, "openbar.font", "Openbar.Font", &type, &value) ==
-	    True)
-		set_config_string(&config->font, value.addr);
-	if (XrmGetResource(db, "openbar.foreground", "Openbar.Foreground",
-	    &type, &value) == True)
-		set_config_string(&config->foreground, value.addr);
-	if (XrmGetResource(db, "openbar.background", "Openbar.Background",
-	    &type, &value) == True)
-		set_config_string(&config->background, value.addr);
-	(void)type;
-
-	XrmDestroyDatabase(db);
+fail:
+	if (file != NULL)
+		fclose(file);
+	config_free(&config);
+	exit(EXIT_FAILURE);
 }
 
 static int
@@ -374,13 +466,6 @@ set_socket_timeouts(int fd)
 	return 0;
 }
 
-/*
- * update_public_ip – fetch the public IPv4 address from ifconfig.me.
- *
- * Returns NET_OK on success, or an error code on failure.
- * Never calls exit(); the caller handles the error.
- * Must only be called from the network worker which holds "inet dns".
- */
 static int
 update_public_ip(void)
 {
@@ -472,13 +557,6 @@ update_public_ip(void)
 	return NET_OK;
 }
 
-/*
- * update_public_ipv6 – fetch the public IPv6 address from ifconfig.me.
- *
- * Returns NET_OK on success, or an error code on failure.
- * Never calls exit(); the caller handles the error.
- * Must only be called from the network worker which holds "inet dns".
- */
 static int
 update_public_ipv6(void)
 {
@@ -570,18 +648,6 @@ update_public_ipv6(void)
 	return NET_OK;
 }
 
-/*
- * network_worker – child‑process entry point.
- *
- * Receives a one‑byte IPC_CMD_FETCH command from the parent,
- * fetches both IPv4 and IPv6 public addresses, and sends a
- * fixed‑size net_response back.
- *
- * This process is sandboxed with pledge("stdio inet dns", NULL)
- * and an unveil locked to the DNS resolution files only.  It never
- * accesses the X11 display, sysctl, battery, filesystem beyond
- * DNS helpers, or any other parent resource.
- */
 static void
 network_worker(int fd)
 {
@@ -632,7 +698,7 @@ get_hostname(void)
 }
 
 void
-update_internal_ip(struct Config config)
+update_internal_ip(const struct Config *config)
 {
 	struct ifaddrs		*ifap, *ifa;
 	struct sockaddr_in	*sa;
@@ -644,8 +710,8 @@ update_internal_ip(struct Config config)
 
 	bool found_interface = false;
 	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
-		if (config.interface != NULL &&
-		    strcmp(ifa->ifa_name, config.interface) == 0 &&
+		if (config->interface != NULL &&
+		    strcmp(ifa->ifa_name, config->interface) == 0 &&
 		    ifa->ifa_addr != NULL &&
 		    ifa->ifa_addr->sa_family == AF_INET) {
 			sa = (struct sockaddr_in *)ifa->ifa_addr;
@@ -722,7 +788,7 @@ update_cpu_avg_speed(void)
 		strlcpy(cpu_avg_speed, "N/A", sizeof(cpu_avg_speed));
 		return;
 	}
-	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4dMhz", freq);
+	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4dMHz", freq);
 }
 
 void
@@ -815,16 +881,57 @@ update_datetime(void)
 		strlcpy(datetime, "N/A", sizeof(datetime));
 }
 
-void
-create_window(Display *display, Window *window, GC *gc, int screen,
-    const struct Config *config)
+static XftColor *
+xft_colors_alloc(Display *display, int screen, const struct Config *config)
 {
-	int screen_width = DisplayWidth(display, screen);
-	int window_width = screen_width;
-	int window_height = 30;
+	XftColor	*colors;
+	unsigned int	 i;
+	Visual		*visual;
+	Colormap	 colormap;
 
-	*window = XCreateSimpleWindow(display, RootWindow(display, screen), 0,
-	    0, window_width, window_height, 1,
+	colors = xmalloc(COLOR_NITEMS * sizeof(XftColor));
+	visual = DefaultVisual(display, screen);
+	colormap = DefaultColormap(display, screen);
+
+	for (i = 0; i < COLOR_NITEMS; i++) {
+		if (!XftColorAllocName(display, visual, colormap,
+		    config->color[i], &colors[i])) {
+			warnx("Cannot allocate color: %s", config->color[i]);
+			XftColorAllocName(display, visual, colormap,
+			    color_defaults[i], &colors[i]);
+		}
+	}
+	return colors;
+}
+
+static void
+xft_colors_free(Display *display, int screen, XftColor *colors)
+{
+	unsigned int	i;
+	Visual		*visual;
+	Colormap	 colormap;
+
+	visual = DefaultVisual(display, screen);
+	colormap = DefaultColormap(display, screen);
+	for (i = 0; i < COLOR_NITEMS; i++)
+		XftColorFree(display, visual, colormap, &colors[i]);
+	free(colors);
+}
+
+static void
+create_window(Display *display, Window *window, XftDraw **xftdraw, int screen,
+    const struct Config *config, const XftColor *xftcolor)
+{
+	int		 screen_width = DisplayWidth(display, screen);
+	int		 window_width = screen_width;
+	int		 window_height = config->barheight;
+	Colormap	 colormap;
+	Visual		*visual;
+
+	*window = XCreateSimpleWindow(display, RootWindow(display, screen),
+	    config->gap.left, config->gap.top,
+	    window_width - config->gap.left - config->gap.right,
+	    window_height, 0,
 	    BlackPixel(display, screen), WhitePixel(display, screen));
 
 	XSelectInput(display, *window, ExposureMask | KeyPressMask);
@@ -844,7 +951,6 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	    XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
 	Atom wm_state_sticky =
 	    XInternAtom(display, "_NET_WM_STATE_STICKY", False);
-	XMoveWindow(display, *window, 0, 0);
 
 	Atom wm_state_atoms[] = {wm_state_above,
 		wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky};
@@ -856,82 +962,66 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	XChangeProperty(display, *window, wm_bypass_compositor, XA_CARDINAL, 32,
 	    PropModeReplace, (unsigned char *)&bypass, 1);
 
-	*gc = XCreateGC(display, *window, 0, NULL);
-	if (*gc == NULL) {
-		fprintf(stderr, "Cannot create graphics context\n");
-		exit(1);
-	}
+	visual = DefaultVisual(display, screen);
+	colormap = DefaultColormap(display, screen);
 
-	XFontStruct *font_info = XLoadQueryFont(
-	    display, config->font != NULL ? config->font : "fixed");
-	if (!font_info)
-		font_info = XLoadQueryFont(display, "fixed");
-	if (!font_info) {
-		fprintf(stderr, "Error: Failed to load font\n");
-		XFreeGC(display, *gc);
+	XSetWindowBackground(display, *window, xftcolor[BAR_BG].pixel);
+
+	*xftdraw = XftDrawCreate(display, *window, visual, colormap);
+	if (*xftdraw == NULL) {
+		fprintf(stderr, "Cannot create Xft draw\n");
+		XDestroyWindow(display, *window);
 		XCloseDisplay(display);
 		exit(1);
 	}
-	XSetFont(display, *gc, font_info->fid);
 
-	Colormap	colormap = DefaultColormap(display, screen);
-	XColor		fg, bg;
-	unsigned long	fg_pixel = BlackPixel(display, screen);
-	unsigned long	bg_pixel = WhitePixel(display, screen);
-
-	if (config->foreground != NULL &&
-	    XAllocNamedColor(
-	    display, colormap, config->foreground, &fg, &fg))
-		fg_pixel = fg.pixel;
-	if (config->background != NULL &&
-	    XAllocNamedColor(
-	    display, colormap, config->background, &bg, &bg))
-		bg_pixel = bg.pixel;
-
-	XSetForeground(display, *gc, fg_pixel);
-	XSetBackground(display, *gc, bg_pixel);
-	XSetWindowBackground(display, *window, bg_pixel);
 	XClearWindow(display, *window);
 	XMapRaised(display, *window);
 }
 
-void
-draw_text(Display *display, Window window, GC gc, const char *text)
+static void
+draw_text(Display *display, Window win, XftDraw *xftdraw, XftFont *font,
+    const XftColor *xftcolor, const char *text)
 {
-	XClearWindow(display, window);
+	XWindowAttributes	 window_attributes;
 
-	XWindowAttributes window_attributes;
-	XGetWindowAttributes(display, window, &window_attributes);
+	XGetWindowAttributes(display, win, &window_attributes);
 	int window_width = window_attributes.width;
+	int window_height = window_attributes.height;
 
-	XFontStruct *font_info = XQueryFont(display, XGContextFromGC(gc));
-	if (font_info == NULL) {
-		fprintf(stderr, "Error: Failed to query font information\n");
+	XftDrawRect(xftdraw, &xftcolor[BAR_BG], 0, 0,
+	    window_width, window_height);
+
+	if (font == NULL || text == NULL)
 		return;
-	}
-	int text_width = XTextWidth(font_info, text, (int)strlen(text));
-	XFreeFontInfo(NULL, font_info, 1);
 
-	int x_position = (window_width - text_width) / 2;
-	int y_position = 20;
+	XGlyphInfo extents;
+	XftTextExtentsUtf8(display, font, (const FcChar8 *)text,
+	    (int)strlen(text), &extents);
 
-	XDrawString(
-	    display, window, gc, x_position, y_position, text,
-	    (int)strlen(text));
-	XFlush(display);
+	int x_position = (window_width - extents.xOff) / 2;
+	int y_position = (window_height + font->ascent - font->descent) / 2;
+
+	XftDrawStringUtf8(xftdraw, &xftcolor[BAR_FG], font,
+	    x_position, y_position,
+	    (const FcChar8 *)text, (int)strlen(text));
 }
 
-static int validate_ip(const char *, int);
+static int
+validate_ip(const char *s, int family)
+{
+	struct in_addr	 address_v4;
+	struct in6_addr	 address_v6;
 
-/*
- * net_fetch – request IP data from the network worker.
- *
- * Sends IPC_CMD_FETCH, reads the response, validates the result,
- * and copies valid addresses into the caller's buffers.
- *
- * Returns 0 on success (at least one address available),
- * -1 if the worker is dead or the protocol is violated.
- */
+	if (s == NULL || s[0] == '\0')
+		return -1;
+	if (family == AF_INET)
+		return inet_pton(AF_INET, s, &address_v4) == 1 ? 0 : -1;
+	if (family == AF_INET6)
+		return inet_pton(AF_INET6, s, &address_v6) == 1 ? 0 : -1;
+	return -1;
+}
+
 static int
 net_fetch(int fd, char *v4buf, size_t v4len, char *v6buf, size_t v6len)
 {
@@ -969,13 +1059,6 @@ net_fetch(int fd, char *v4buf, size_t v4len, char *v6buf, size_t v6len)
 	return 0;
 }
 
-/*
- * build_pledge – construct the minimal steady‑state pledge string.
- *
- * Always included: "stdio unix".  VM_UVMEXP requires "vminfo";
- * HW_SENSORS is allowed without an extra promise.  getifaddrs(3)
- * requires "route"; VM_UVMEXP requires "vminfo".
- */
 static void
 build_pledge(char *buf, size_t bufsz, const struct Config *cfg)
 {
@@ -995,7 +1078,7 @@ resolve_xauthority_path(void)
 	authority = getenv("XAUTHORITY");
 	if (authority != NULL && authority[0] != '\0') {
 		if (realpath(authority, resolved) != NULL)
-			return strdup(resolved);
+			return xstrdup(resolved);
 		return NULL;
 	}
 	home = getenv("HOME");
@@ -1004,20 +1087,9 @@ resolve_xauthority_path(void)
 		return NULL;
 	if (realpath(candidate, resolved) == NULL)
 		return NULL;
-	return strdup(resolved);
+	return xstrdup(resolved);
 }
 
-/*
- * unveil_parent – set up the main‑process filesystem view and lock it.
- *
- * Unveiled paths:
- *   /tmp/.X11-unix   rw – X11 display socket
- *   authority_path    r  – Xauthority file, when one exists
- *   /dev/apm         r  – battery status (only if the node exists)
- *
- * The parent does NOT unveil /etc/hosts, /etc/resolv.conf or
- * /etc/services because DNS resolution is handled by the child.
- */
 static int
 unveil_parent(const char *authority_path, int show_bat)
 {
@@ -1042,13 +1114,6 @@ unveil_parent(const char *authority_path, int show_bat)
 	return 0;
 }
 
-/*
- * unveil_child – set up the network‑worker filesystem view and lock it.
- *
- * Only DNS resolution helper files are unveiled.  The child has
- * no access to the configuration, X11 socket, battery device,
- * or any other parent resource.
- */
 static int
 unveil_child(void)
 {
@@ -1075,31 +1140,15 @@ unveil_child(void)
 	return 0;
 }
 
-/*
- * validate_ip – parse the received address using the system IP parser.
- */
-static int
-validate_ip(const char *s, int family)
-{
-	struct in_addr	 address_v4;
-	struct in6_addr	 address_v6;
-
-	if (s == NULL || s[0] == '\0')
-		return -1;
-	if (family == AF_INET)
-		return inet_pton(AF_INET, s, &address_v4) == 1 ? 0 : -1;
-	if (family == AF_INET6)
-		return inet_pton(AF_INET6, s, &address_v6) == 1 ? 0 : -1;
-	return -1;
-}
-
 int
 main(int argc, const char *argv[])
 {
 	Display		*display;
 	Window		 window;
-	GC		 gc;
 	struct Config	 config;
+	XftDraw		*xftdraw;
+	XftFont		*xftfont;
+	XftColor	*xftcolor;
 	int		 screen, opt, run_once = 0;
 	const char	*config_override = NULL;
 	char		*config_path, *authority_path;
@@ -1127,12 +1176,11 @@ main(int argc, const char *argv[])
 	config_path = resolve_config_path(config_override);
 	if (config_path == NULL)
 		errx(EXIT_FAILURE, "Failed to resolve config path");
-	config = config_file(config_path);
+	config = config_load(config_path);
 	free(config_path);
 	if (config.logo == NULL)
 		errx(EXIT_FAILURE, "No logo configured");
 
-	/* The network worker exists only when the widget is enabled. */
 	if (config.show_net) {
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
 			err(EXIT_FAILURE, "socketpair");
@@ -1159,7 +1207,7 @@ main(int argc, const char *argv[])
 		if (sv[1] != -1)
 			close(sv[1]);
 		free(authority_path);
-		free_config(&config);
+		config_free(&config);
 		return 1;
 	}
 	free(authority_path);
@@ -1169,19 +1217,32 @@ main(int argc, const char *argv[])
 		warnx("Cannot open display");
 		if (sv[1] != -1)
 			close(sv[1]);
-		free_config(&config);
+		config_free(&config);
 		return 1;
 	}
 	screen = DefaultScreen(display);
 
-	load_xresources(display, &config);
-	create_window(display, &window, &gc, screen, &config);
+	xftcolor = xft_colors_alloc(display, screen, &config);
+
+	xftfont = XftFontOpenName(display, screen, config.fontname);
+	if (xftfont == NULL) {
+		warnx("Cannot open font: %s", config.fontname);
+		xftfont = XftFontOpenName(display, screen,
+		    "sans-serif:pixelsize=14:bold");
+		if (xftfont == NULL) {
+			XCloseDisplay(display);
+			xft_colors_free(display, screen, xftcolor);
+			config_free(&config);
+			errx(EXIT_FAILURE, "No font available");
+		}
+	}
+
+	create_window(display, &window, &xftdraw, screen, &config, xftcolor);
 	if (config.show_cpu)
 		update_cpu_avg_speed();
 
-	/* APM_IOC_GETPOWER is not available under any pledge promise. */
 	if (config.show_bat) {
-		warnx("bat=yes: parent pledge disabled; unveil remains active");
+		warnx("bar: parent pledge disabled; unveil remains active");
 	} else {
 		build_pledge(steadystr, sizeof(steadystr), &config);
 		if (pledge(steadystr, NULL) == -1)
@@ -1196,70 +1257,73 @@ main(int argc, const char *argv[])
 
 		if (config.logo != NULL && strlen(config.logo) > 0) {
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "%s", config.logo);
+			    sizeof(buffer) - strlen(buffer), "%s",
+			    config.logo);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_hostname) {
 			char *hostname = get_hostname();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " %s ", hostname);
+			    sizeof(buffer) - strlen(buffer), " %s",
+			    hostname);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_date) {
 			update_datetime();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " %s ", datetime);
+			    sizeof(buffer) - strlen(buffer), " %s",
+			    datetime);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_cpu) {
 			update_cpu_temp();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " CPU: %s (%s) ",
-			    cpu_avg_speed, cpu_temp);
+			    sizeof(buffer) - strlen(buffer),
+			    " CPU: %s (%s)", cpu_avg_speed, cpu_temp);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " Mem: %llu MB ",
-			    free_memory);
+			    sizeof(buffer) - strlen(buffer),
+			    " Mem: %llu MB", free_memory);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_load) {
 			update_system_load(system_load);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " Load: %.2f ",
-			    system_load[0]);
+			    sizeof(buffer) - strlen(buffer),
+			    " Load: %.2f", system_load[0]);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_bat) {
 			update_battery();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " Bat: %s ",
-			    battery_percent);
+			    sizeof(buffer) - strlen(buffer),
+			    " Bat: %s", battery_percent);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_vpn) {
 			update_vpn();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " VPN: %s ",
-			    vpn_status);
+			    sizeof(buffer) - strlen(buffer),
+			    " VPN: %s", vpn_status);
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), "|");
+			    sizeof(buffer) - strlen(buffer), " |");
 		}
 
 		if (config.show_net) {
@@ -1273,14 +1337,15 @@ main(int argc, const char *argv[])
 					    sizeof(public_ipv6));
 				}
 			}
-			update_internal_ip(config);
+			update_internal_ip(&config);
 			snprintf(buffer + strlen(buffer),
 			    sizeof(buffer) - strlen(buffer),
-			    " IPs: %s | %s ~ %s ", public_ip,
+			    " IPs: %s | %s ~ %s", public_ip,
 			    public_ipv6, internal_ip);
 		}
 
-		draw_text(display, window, gc, buffer);
+		draw_text(display, window, xftdraw, xftfont, xftcolor,
+		    buffer);
 		XFlush(display);
 
 		ip_update_counter = (ip_update_counter + 1) % 10;
@@ -1293,9 +1358,11 @@ main(int argc, const char *argv[])
 
 	if (sv[1] != -1)
 		close(sv[1]);
-	XFreeGC(display, gc);
+	XftDrawDestroy(xftdraw);
+	XftFontClose(display, xftfont);
+	xft_colors_free(display, screen, xftcolor);
 	XDestroyWindow(display, window);
-	free_config(&config);
 	XCloseDisplay(display);
+	config_free(&config);
 	return 0;
 }
