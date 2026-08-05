@@ -1,10 +1,11 @@
 # Compiler and flags
-CC ?= cc
-LIBS = -L/usr/X11R6/lib -lX11
+CC = clang
+CFLAGS = -O2 -pipe
+CFLAGS += -Wall -Wextra -std=c99
+CPPFLAGS += -I/usr/X11R6/include -I.
+LDLIBS += -L/usr/X11R6/lib -lX11
 OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
-CFLAGS = -pipe -Wall -Werror -march=native -std=c99
-INCLUDEDIR = -I/usr/X11R6/include -I.
 INFO = ==>
 
 # Targets
@@ -20,25 +21,32 @@ MAN5 = ${MANDIR}/man5
 
 # Default target to build the project
 .PHONY: all
-all: build
+all: ${TARGET}
 
-# Build target with debugging flags
+# Normal build target.
 .PHONY: build
-build: clean
-	@echo "${INFO} Building ${TARGET} (debug)"
-	@${CC} ${DBGFLAGS} ${CFLAGS} ${INCLUDEDIR} -o ${TARGET} openbar.c ${LIBS}
+build: ${TARGET}
+
+${TARGET}: openbar.c
+	@echo "${INFO} Building ${TARGET}"
+	@${CC} ${CFLAGS} ${CPPFLAGS} -o ${TARGET} openbar.c ${LDFLAGS} ${LDLIBS}
 
 # Build target with optimization flags
 .PHONY: opt
 opt: clean
 	@echo "${INFO} Building ${TARGET} (opt)"
-	@${CC} ${OPTFLAGS} ${CFLAGS} ${INCLUDEDIR} -o ${TARGET} openbar.c ${LIBS}
+	@${CC} ${CFLAGS} ${OPTFLAGS} ${CPPFLAGS} -o ${TARGET} openbar.c ${LDFLAGS} ${LDLIBS}
+
+.PHONY: debug-build
+debug-build: clean
+	@echo "${INFO} Building ${TARGET} (debug)"
+	@${CC} ${CFLAGS} ${DBGFLAGS} ${CPPFLAGS} -o ${TARGET} openbar.c ${LDFLAGS} ${LDLIBS}
 
 # Install target to copy the executable, config, and man pages to appropriate directories
 .PHONY: install
 install: ${TARGET}
 	@echo "${INFO} Installing ${TARGET} -> ${INSTALLTARGET}" && mkdir -p ${BINDIR} && install -s ${TARGET} ${INSTALLTARGET}
-	@echo "${INFO} Installing ${CONFIG} -> ${INSTALLCONFIG}" && mkdir -p ${CONFIGDIR} && install -m 644 ${CONFIG} ${INSTALLCONFIG}
+	@echo "${INFO} Installing ${CONFIG} -> ${INSTALLCONFIG}" && mkdir -p ${CONFIGDIR} && install -b -m 644 ${CONFIG} ${INSTALLCONFIG}
 	@echo "${INFO} Installing man pages -> ${MAN1}/openbar.1 and ${MAN5}/openbar.conf.5" && mkdir -p ${MAN1} ${MAN5} && install -m 644 openbar.1 ${MAN1}/openbar.1 && install -m 644 openbar.conf.5 ${MAN5}/openbar.conf.5 && echo "${INFO} Install complete"
 
 # Clean target to remove build artifacts
@@ -57,14 +65,14 @@ uninstall:
 
 # Debug target to run the program in a debugger
 .PHONY: debug
-debug: build
+debug: debug-build
 	@echo "${INFO} Starting debugger for ${TARGET}"
 	@egdb -q ./${TARGET} -ex "break main" -ex "run"
 
 # Help target to display available commands
 .PHONY: help
 help:
-	@printf "Available targets:\n  all        - Build the project with debugging flags\n  build      - Build the project with debugging flags\n  opt        - Build the project with optimization flags\n  install    - Install the executable, config, and man pages\n  clean      - Remove build artifacts\n  uninstall  - Remove the installed files\n  debug      - Run the program in a debugger\n  test       - Placeholder for tests\n"
+	@printf "Available targets:\n  all        - Build the project\n  build      - Build the project\n  opt        - Build with -O3\n  install    - Install the executable, config, and man pages\n  clean      - Remove build artifacts\n  uninstall  - Remove the installed files\n  debug      - Build with debug symbols and start egdb\n  test       - Report test availability\n"
 
 .PHONY: test
 test:
