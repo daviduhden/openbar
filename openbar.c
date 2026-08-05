@@ -296,7 +296,8 @@ config_file(const char *config_file_path)
 				setting = &config.show_vpn;
 
 			if (setting == NULL)
-				warnx("Ignoring unknown configuration key: %s", key);
+				warnx("Ignoring unknown configuration key: %s",
+				    key);
 			else if (strcmp(value, "yes") == 0)
 				*setting = 1;
 			else if (strcmp(value, "no") == 0)
@@ -833,7 +834,8 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	    False);
 	Atom wm_bypass_compositor = XInternAtom(display,
 	    "_NET_WM_BYPASS_COMPOSITOR", False);
-	Atom wm_window_type = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+	Atom wm_window_type = XInternAtom(display, "_NET_WM_WINDOW_TYPE",
+	    False);
 	Atom wm_window_type_dock = XInternAtom(display,
 	    "_NET_WM_WINDOW_TYPE_DOCK", False);
 	Atom wm_state_skip_taskbar =
