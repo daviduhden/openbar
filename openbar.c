@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2024 Gonzalo Rodriguez <gonzalo@x61.sh>
- * Copyright (c) 2024-2026 David David Uhden Collado <david@uhden.dev>
+ * Copyright (c) 2024-2026 David Uhden Collado <david@uhden.dev>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -99,7 +99,6 @@ struct net_response {
 
 static char		battery_percent[32];
 static char		cpu_temp[32];
-static char		cpu_base_speed[32];
 static char		cpu_avg_speed[32];
 static char		datetime[32];
 static char		public_ip[MAX_IP_LENGTH];
@@ -124,6 +123,8 @@ struct Config {
 	int		 show_net;
 	int		 show_vpn;
 };
+
+static void set_config_string(char **, const char *);
 
 static ssize_t
 xread(int fd, void *buf, size_t n)
@@ -159,36 +160,25 @@ xwrite(int fd, const void *buf, size_t n)
 				continue;
 			return -1;
 		}
+		if (r == 0)
+			return -1;
 		left -= (size_t)r;
 		p += r;
 	}
 	return (ssize_t)n;
 }
 
-char *
-extract_logo(const char *line)
+static char *
+trim(char *value)
 {
-	if (strstr(line, "logo=")) {
-		const char *logo_start = strchr(line, '=') + 1;
-		const char *logo_end = NULL;
+	char *end;
 
-		const char *cursor = logo_start;
-		while (*cursor && *cursor != ' ' && *cursor != '\n')
-			cursor++;
-		logo_end = cursor;
-
-		size_t logo_length = (size_t)(logo_end - logo_start);
-
-		char *logo = malloc(logo_length + 1);
-		if (logo == NULL) {
-			perror("Failed to allocate memory for logo");
-			exit(EXIT_FAILURE);
-		}
-		memcpy(logo, logo_start, logo_length);
-		logo[logo_length] = '\0';
-		return logo;
-	}
-	return NULL;
+	while (*value == ' ' || *value == '\t')
+		value++;
+	end = value + strlen(value);
+	while (end > value && (end[-1] == ' ' || end[-1] == '\t'))
+		*--end = '\0';
+	return value;
 }
 
 void
@@ -264,41 +254,57 @@ config_file(const char *config_file_path)
 	char line[MAX_LINE_LENGTH];
 
 	while (fgets(line, sizeof(line), file)) {
-		line[strcspn(line, "\n")] = '\0';
+		char *key, *value, *separator;
 
-		char *logo = extract_logo(line);
-		if (logo != NULL) {
-			free(config.logo);
-			config.logo = logo;
+		if (strchr(line, '\n') == NULL && !feof(file))
+			errx(EXIT_FAILURE, "Configuration line is too long");
+		line[strcspn(line, "\n")] = '\0';
+		key = trim(line);
+		if (*key == '\0' || *key == '#')
+			continue;
+		separator = strchr(key, '=');
+		if (separator == NULL) {
+			warnx("Ignoring malformed configuration line: %s", key);
 			continue;
 		}
-		if (strstr(line, "interface=")) {
-			const char *istart = strchr(line, '=') + 1;
-			size_t ilen = strlen(istart);
-			free(config.interface);
-			config.interface = malloc(ilen + 1);
-			if (config.interface == NULL)
-				err(EXIT_FAILURE,
-				    "Failed to allocate memory for interface");
-			memcpy(config.interface, istart, ilen);
-			config.interface[ilen] = '\0';
+		*separator = '\0';
+		value = trim(separator + 1);
+		key = trim(key);
+
+		if (strcmp(key, "logo") == 0)
+			set_config_string(&config.logo, value);
+		else if (strcmp(key, "interface") == 0)
+			set_config_string(&config.interface, value);
+		else {
+			int *setting = NULL;
+
+			if (strcmp(key, "date") == 0)
+				setting = &config.show_date;
+			else if (strcmp(key, "cpu") == 0)
+				setting = &config.show_cpu;
+			else if (strcmp(key, "load") == 0)
+				setting = &config.show_load;
+			else if (strcmp(key, "bat") == 0)
+				setting = &config.show_bat;
+			else if (strcmp(key, "net") == 0)
+				setting = &config.show_net;
+			else if (strcmp(key, "mem") == 0)
+				setting = &config.show_mem;
+			else if (strcmp(key, "hostname") == 0)
+				setting = &config.show_hostname;
+			else if (strcmp(key, "vpn") == 0)
+				setting = &config.show_vpn;
+
+			if (setting == NULL)
+				warnx("Ignoring unknown configuration key: %s", key);
+			else if (strcmp(value, "yes") == 0)
+				*setting = 1;
+			else if (strcmp(value, "no") == 0)
+				*setting = 0;
+			else
+				errx(EXIT_FAILURE,
+				    "%s must be either yes or no", key);
 		}
-		if (strstr(line, "date=yes"))
-			config.show_date = 1;
-		else if (strstr(line, "cpu=yes"))
-			config.show_cpu = 1;
-		else if (strstr(line, "load=yes"))
-			config.show_load = 1;
-		else if (strstr(line, "bat=yes"))
-			config.show_bat = 1;
-		else if (strstr(line, "net=yes"))
-			config.show_net = 1;
-		else if (strstr(line, "mem=yes"))
-			config.show_mem = 1;
-		else if (strstr(line, "hostname=yes"))
-			config.show_hostname = 1;
-		else if (strstr(line, "vpn=yes"))
-			config.show_vpn = 1;
 	}
 
 	fclose(file);
@@ -353,6 +359,20 @@ load_xresources(Display *display, struct Config *config)
 	XrmDestroyDatabase(db);
 }
 
+static int
+set_socket_timeouts(int fd)
+{
+	struct timeval timeout = {10, 0};
+
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+	    sizeof(timeout)) == -1)
+		return -1;
+	if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+	    sizeof(timeout)) == -1)
+		return -1;
+	return 0;
+}
+
 /*
  * update_public_ip – fetch the public IPv4 address from ifconfig.me.
  *
@@ -380,6 +400,11 @@ update_public_ip(void)
 		freeaddrinfo(res);
 		return NET_ERR_SYS;
 	}
+	if (set_socket_timeouts(sockfd) == -1) {
+		close(sockfd);
+		freeaddrinfo(res);
+		return NET_ERR_SYS;
+	}
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
 		close(sockfd);
@@ -396,6 +421,13 @@ update_public_ip(void)
 		ssize_t sent = send(sockfd, request + total_sent,
 		    request_len - total_sent, 0);
 		if (sent == -1) {
+			if (errno == EINTR)
+				continue;
+			close(sockfd);
+			freeaddrinfo(res);
+			return NET_ERR_SYS;
+		}
+		if (sent == 0) {
 			close(sockfd);
 			freeaddrinfo(res);
 			return NET_ERR_SYS;
@@ -405,11 +437,17 @@ update_public_ip(void)
 
 	ssize_t	bytes_received;
 	size_t	total_bytes_received = 0;
-	while ((bytes_received = recv(sockfd,
-	    buffer + total_bytes_received,
-	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
-		total_bytes_received += (size_t)bytes_received;
-	if (bytes_received == -1) {
+	for (;;) {
+		bytes_received = recv(sockfd, buffer + total_bytes_received,
+		    sizeof(buffer) - 1 - total_bytes_received, 0);
+		if (bytes_received > 0) {
+			total_bytes_received += (size_t)bytes_received;
+			continue;
+		}
+		if (bytes_received == 0)
+			break;
+		if (errno == EINTR)
+			continue;
 		close(sockfd);
 		freeaddrinfo(res);
 		return NET_ERR_RECV;
@@ -423,6 +461,8 @@ update_public_ip(void)
 		public_ip[MAX_IP_LENGTH - 1] = '\0';
 		public_ip[strcspn(public_ip, "\r\n")] = '\0';
 	} else {
+		close(sockfd);
+		freeaddrinfo(res);
 		return NET_ERR_PARSE;
 	}
 
@@ -458,6 +498,11 @@ update_public_ipv6(void)
 		freeaddrinfo(res);
 		return NET_ERR_SYS;
 	}
+	if (set_socket_timeouts(sockfd) == -1) {
+		close(sockfd);
+		freeaddrinfo(res);
+		return NET_ERR_SYS;
+	}
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) == -1) {
 		close(sockfd);
@@ -474,6 +519,13 @@ update_public_ipv6(void)
 		ssize_t sent = send(sockfd, request + total_sent,
 		    request_len - total_sent, 0);
 		if (sent == -1) {
+			if (errno == EINTR)
+				continue;
+			close(sockfd);
+			freeaddrinfo(res);
+			return NET_ERR_SYS;
+		}
+		if (sent == 0) {
 			close(sockfd);
 			freeaddrinfo(res);
 			return NET_ERR_SYS;
@@ -483,11 +535,17 @@ update_public_ipv6(void)
 
 	ssize_t	bytes_received;
 	size_t	total_bytes_received = 0;
-	while ((bytes_received = recv(sockfd,
-	    buffer + total_bytes_received,
-	    sizeof(buffer) - 1 - total_bytes_received, 0)) > 0)
-		total_bytes_received += (size_t)bytes_received;
-	if (bytes_received == -1) {
+	for (;;) {
+		bytes_received = recv(sockfd, buffer + total_bytes_received,
+		    sizeof(buffer) - 1 - total_bytes_received, 0);
+		if (bytes_received > 0) {
+			total_bytes_received += (size_t)bytes_received;
+			continue;
+		}
+		if (bytes_received == 0)
+			break;
+		if (errno == EINTR)
+			continue;
 		close(sockfd);
 		freeaddrinfo(res);
 		return NET_ERR_RECV;
@@ -501,6 +559,8 @@ update_public_ipv6(void)
 		public_ipv6[sizeof(public_ipv6) - 1] = '\0';
 		public_ipv6[strcspn(public_ipv6, "\r\n")] = '\0';
 	} else {
+		close(sockfd);
+		freeaddrinfo(res);
 		return NET_ERR_PARSE;
 	}
 
@@ -565,6 +625,7 @@ get_hostname(void)
 		perror("gethostname");
 		exit(EXIT_FAILURE);
 	}
+	hostname[sizeof(hostname) - 1] = '\0';
 
 	return hostname;
 }
@@ -587,15 +648,16 @@ update_internal_ip(struct Config config)
 		    ifa->ifa_addr != NULL &&
 		    ifa->ifa_addr->sa_family == AF_INET) {
 			sa = (struct sockaddr_in *)ifa->ifa_addr;
-			inet_ntop(AF_INET, &(sa->sin_addr), internal_ip,
-			    sizeof(internal_ip));
-			found_interface = true;
-			break;
+			if (inet_ntop(AF_INET, &(sa->sin_addr), internal_ip,
+			    sizeof(internal_ip)) != NULL) {
+				found_interface = true;
+				break;
+			}
 		}
 	}
 
 	if (!found_interface)
-		strlcpy(internal_ip, "lo0", sizeof(internal_ip));
+		strlcpy(internal_ip, "N/A", sizeof(internal_ip));
 
 	freeifaddrs(ifap);
 }
@@ -649,31 +711,17 @@ update_mem(void)
 }
 
 void
-update_cpu_base_speed(void)
-{
-	int	temp = 0;
-	size_t	templen = sizeof(temp);
-	int	mib[5] = {CTL_HW, HW_CPUSPEED};
-
-	if (sysctl(mib, 2, &temp, &templen, NULL, 0) == -1)
-		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "error");
-	else
-		snprintf(cpu_base_speed, sizeof(cpu_base_speed), "%4dMhz",
-		    temp);
-}
-
-void
 update_cpu_avg_speed(void)
 {
-	uint64_t	freq = 0;
+	int		freq = 0;
 	size_t		len = sizeof(freq);
 	int		mib[2] = {CTL_HW, HW_CPUSPEED};
 
 	if (sysctl(mib, 2, &freq, &len, NULL, 0) == -1) {
-		fprintf(stderr, "Error: Failed to get CPU average speed\n");
+		strlcpy(cpu_avg_speed, "N/A", sizeof(cpu_avg_speed));
 		return;
 	}
-	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4lluMhz", freq);
+	snprintf(cpu_avg_speed, sizeof(cpu_avg_speed), "%4dMhz", freq);
 }
 
 void
@@ -681,9 +729,8 @@ update_system_load(double *load_avg)
 {
 	double load[3];
 
-	if (getloadavg(load, 3) == -1) {
-		perror("getloadavg");
-		exit(EXIT_FAILURE);
+	if (getloadavg(load, 3) != 3) {
+		errx(EXIT_FAILURE, "getloadavg returned incomplete data");
 	}
 
 	for (int i = 0; i < 3; i++)
@@ -706,9 +753,11 @@ update_cpu_temp(void)
 			if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1)
 				break;
 		}
+		if (temp_mib == 20)
+			temp_mib = -2;
 	}
 
-	if (temp_mib != -1) {
+	if (temp_mib >= 0) {
 		int mib[5] = {CTL_HW, HW_SENSORS, temp_mib, SENSOR_TEMP, 0};
 		if (sysctl(mib, 5, &sensor, &templen, NULL, 0) != -1) {
 			temp = (sensor.value - 273150000) / 1000000.0;
@@ -725,14 +774,27 @@ update_battery(void)
 	int			fd;
 	struct apm_power_info	pi;
 
-	if ((fd = open("/dev/apm", O_RDONLY)) == -1 ||
-	    ioctl(fd, APM_IOC_GETPOWER, &pi) == -1 || close(fd) == -1) {
+	fd = open("/dev/apm", O_RDONLY);
+	if (fd == -1) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
+	if (ioctl(fd, APM_IOC_GETPOWER, &pi) == -1) {
+		close(fd);
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
+	if (close(fd) == -1) {
 		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
 		return;
 	}
 
-	snprintf(battery_percent, sizeof(battery_percent), "%d%%",
-	    pi.battery_life);
+	if (pi.battery_life > 100) {
+		strlcpy(battery_percent, "N/A", sizeof(battery_percent));
+		return;
+	}
+	snprintf(battery_percent, sizeof(battery_percent), "%u%%",
+	    (unsigned int)pi.battery_life);
 }
 
 void
@@ -741,9 +803,15 @@ update_datetime(void)
 	time_t		 rawtime;
 	struct tm	*timeinfo;
 
-	time(&rawtime);
+	if (time(&rawtime) == (time_t)-1) {
+		strlcpy(datetime, "N/A", sizeof(datetime));
+		return;
+	}
 	timeinfo = localtime(&rawtime);
-	strftime(datetime, sizeof(datetime), "%a %d %b %H:%M", timeinfo);
+	if (timeinfo == NULL ||
+	    strftime(datetime, sizeof(datetime), "%a %d %b %H:%M",
+	    timeinfo) == 0)
+		strlcpy(datetime, "N/A", sizeof(datetime));
 }
 
 void
@@ -759,13 +827,15 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	    BlackPixel(display, screen), WhitePixel(display, screen));
 
 	XSelectInput(display, *window, ExposureMask | KeyPressMask);
-	XMapWindow(display, *window);
 
 	Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
 	Atom wm_state_above = XInternAtom(display, "_NET_WM_STATE_ABOVE",
 	    False);
-	Atom wm_bypass_wm = XInternAtom(display,
+	Atom wm_bypass_compositor = XInternAtom(display,
 	    "_NET_WM_BYPASS_COMPOSITOR", False);
+	Atom wm_window_type = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+	Atom wm_window_type_dock = XInternAtom(display,
+	    "_NET_WM_WINDOW_TYPE_DOCK", False);
 	Atom wm_state_skip_taskbar =
 	    XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
 	Atom wm_state_skip_pager =
@@ -774,10 +844,15 @@ create_window(Display *display, Window *window, GC *gc, int screen,
 	    XInternAtom(display, "_NET_WM_STATE_STICKY", False);
 	XMoveWindow(display, *window, 0, 0);
 
-	Atom wm_state_atoms[] = {wm_state_above, wm_bypass_wm,
+	Atom wm_state_atoms[] = {wm_state_above,
 		wm_state_skip_taskbar, wm_state_skip_pager, wm_state_sticky};
 	XChangeProperty(display, *window, wm_state, XA_ATOM, 32,
-	    PropModeReplace, (unsigned char *)wm_state_atoms, 5);
+	    PropModeReplace, (unsigned char *)wm_state_atoms, 4);
+	XChangeProperty(display, *window, wm_window_type, XA_ATOM, 32,
+	    PropModeReplace, (unsigned char *)&wm_window_type_dock, 1);
+	unsigned long bypass = 1;
+	XChangeProperty(display, *window, wm_bypass_compositor, XA_CARDINAL, 32,
+	    PropModeReplace, (unsigned char *)&bypass, 1);
 
 	*gc = XCreateGC(display, *window, 0, NULL);
 	if (*gc == NULL) {
@@ -833,6 +908,7 @@ draw_text(Display *display, Window window, GC gc, const char *text)
 		return;
 	}
 	int text_width = XTextWidth(font_info, text, (int)strlen(text));
+	XFreeFontInfo(NULL, font_info, 1);
 
 	int x_position = (window_width - text_width) / 2;
 	int y_position = 20;
@@ -843,7 +919,7 @@ draw_text(Display *display, Window window, GC gc, const char *text)
 	XFlush(display);
 }
 
-static int validate_ip(const char *);
+static int validate_ip(const char *, int);
 
 /*
  * net_fetch – request IP data from the network worker.
@@ -874,13 +950,15 @@ net_fetch(int fd, char *v4buf, size_t v4len, char *v6buf, size_t v6len)
 	resp.addr_v4[sizeof(resp.addr_v4) - 1] = '\0';
 	resp.addr_v6[sizeof(resp.addr_v6) - 1] = '\0';
 
-	if (resp.status_v4 == NET_OK && validate_ip(resp.addr_v4) == 0) {
+	if (resp.status_v4 == NET_OK &&
+	    validate_ip(resp.addr_v4, AF_INET) == 0) {
 		strlcpy(v4buf, resp.addr_v4, v4len);
 	} else {
 		strlcpy(v4buf, "N/A", v4len);
 	}
 
-	if (resp.status_v6 == NET_OK && validate_ip(resp.addr_v6) == 0) {
+	if (resp.status_v6 == NET_OK &&
+	    validate_ip(resp.addr_v6, AF_INET6) == 0) {
 		strlcpy(v6buf, resp.addr_v6, v6len);
 	} else {
 		strlcpy(v6buf, "N/A", v6len);
@@ -892,51 +970,66 @@ net_fetch(int fd, char *v4buf, size_t v4len, char *v6buf, size_t v6len)
 /*
  * build_pledge – construct the minimal steady‑state pledge string.
  *
- * Always included:  "stdio unix".
- * Conditionally:    "sysctl"  – CPU or memory sensors
- *                   "rpath ioctl" – battery status
- *                   "route"   – internal IP and VPN
- *
- * The buffer must be at least 128 bytes.
- * Does NOT include "inet dns proc" – those are never needed
- * by the parent after initialization.
+ * Always included: "stdio unix".  VM_UVMEXP requires "vminfo";
+ * HW_SENSORS is allowed without an extra promise.  getifaddrs(3)
+ * requires "route"; VM_UVMEXP requires "vminfo".
  */
 static void
 build_pledge(char *buf, size_t bufsz, const struct Config *cfg)
 {
 	snprintf(buf, bufsz, "stdio unix");
-	if (cfg->show_cpu || cfg->show_mem)
-		strlcat(buf, " sysctl", bufsz);
-	if (cfg->show_bat)
-		strlcat(buf, " rpath ioctl", bufsz);
+	if (cfg->show_mem)
+		strlcat(buf, " vminfo", bufsz);
 	if (cfg->show_vpn || cfg->show_net)
 		strlcat(buf, " route", bufsz);
+}
+
+static char *
+resolve_xauthority_path(void)
+{
+	char		 candidate[PATH_MAX], resolved[PATH_MAX];
+	const char	*authority, *home;
+
+	authority = getenv("XAUTHORITY");
+	if (authority != NULL && authority[0] != '\0') {
+		if (realpath(authority, resolved) != NULL)
+			return strdup(resolved);
+		return NULL;
+	}
+	home = getenv("HOME");
+	if (home == NULL || home[0] == '\0' ||
+	    snprintf(candidate, sizeof(candidate), "%s/.Xauthority", home) <= 0)
+		return NULL;
+	if (realpath(candidate, resolved) == NULL)
+		return NULL;
+	return strdup(resolved);
 }
 
 /*
  * unveil_parent – set up the main‑process filesystem view and lock it.
  *
  * Unveiled paths:
- *   config_path     r  – configuration file
  *   /tmp/.X11-unix   rw – X11 display socket
+ *   authority_path    r  – Xauthority file, when one exists
  *   /dev/apm         r  – battery status (only if the node exists)
  *
  * The parent does NOT unveil /etc/hosts, /etc/resolv.conf or
  * /etc/services because DNS resolution is handled by the child.
  */
 static int
-unveil_parent(const char *config_path)
+unveil_parent(const char *authority_path, int show_bat)
 {
-	if (unveil(config_path, "r") == -1) {
-		warn("unveil %s", config_path);
-		return -1;
-	}
+	int has_apm = show_bat && access("/dev/apm", R_OK) == 0;
+
 	if (unveil("/tmp/.X11-unix", "rw") == -1) {
 		warn("unveil /tmp/.X11-unix");
 		return -1;
 	}
-	if (access("/dev/apm", R_OK) == 0 &&
-	    unveil("/dev/apm", "r") == -1) {
+	if (authority_path != NULL && unveil(authority_path, "r") == -1) {
+		warn("unveil %s", authority_path);
+		return -1;
+	}
+	if (has_apm && unveil("/dev/apm", "r") == -1) {
 		warn("unveil /dev/apm");
 		return -1;
 	}
@@ -969,6 +1062,10 @@ unveil_child(void)
 		warn("unveil /etc/services");
 		return -1;
 	}
+	if (unveil("/etc/protocols", "r") == -1) {
+		warn("unveil /etc/protocols");
+		return -1;
+	}
 	if (unveil(NULL, NULL) == -1) {
 		warn("unveil lock");
 		return -1;
@@ -977,48 +1074,39 @@ unveil_child(void)
 }
 
 /*
- * validate_ip – basic sanity check for received IP strings.
- *
- * Ensures the string is NUL‑terminated, not empty, and contains
- * only characters valid in IPv4 / IPv6 textual representation.
- * Returns 0 if acceptable, -1 otherwise.
+ * validate_ip – parse the received address using the system IP parser.
  */
 static int
-validate_ip(const char *s)
+validate_ip(const char *s, int family)
 {
-	size_t i;
+	struct in_addr	 address_v4;
+	struct in6_addr	 address_v6;
 
 	if (s == NULL || s[0] == '\0')
 		return -1;
-	for (i = 0; s[i] != '\0'; i++) {
-		if (i >= MAX_IP_LENGTH)
-			return -1;
-		if (s[i] != '.' && s[i] != ':' &&
-		    (s[i] < '0' || s[i] > '9') &&
-		    (s[i] < 'a' || s[i] > 'f') &&
-		    (s[i] < 'A' || s[i] > 'F'))
-			return -1;
-	}
-	return 0;
+	if (family == AF_INET)
+		return inet_pton(AF_INET, s, &address_v4) == 1 ? 0 : -1;
+	if (family == AF_INET6)
+		return inet_pton(AF_INET6, s, &address_v6) == 1 ? 0 : -1;
+	return -1;
 }
 
 int
 main(int argc, const char *argv[])
 {
-	setlocale(LC_CTYPE, "C");
-	setlocale(LC_ALL, "en_US.UTF-8");
-
 	Display		*display;
 	Window		 window;
 	GC		 gc;
-	int		 screen;
-	int		 opt;
-	int		 run_once = 0;
+	struct Config	 config;
+	int		 screen, opt, run_once = 0;
 	const char	*config_override = NULL;
-	char		*config_path;
-	int		 sv[2];
-	pid_t		 pid;
+	char		*config_path, *authority_path;
+	int		 sv[2] = {-1, -1};
+	pid_t		 pid = -1;
 	char		 steadystr[128];
+
+	setlocale(LC_ALL, "");
+	tzset();
 
 	while ((opt = getopt(argc, (char *const *)argv, "1c:")) != -1) {
 		switch (opt) {
@@ -1037,141 +1125,66 @@ main(int argc, const char *argv[])
 	config_path = resolve_config_path(config_override);
 	if (config_path == NULL)
 		errx(EXIT_FAILURE, "Failed to resolve config path");
-
-	/*
-	 * Create the IPC channel before forking, so both parent
-	 * and child inherit the socketpair.  SOCK_STREAM avoids
-	 * datagram truncation and provides reliable EOF detection.
-	 */
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
-		err(EXIT_FAILURE, "socketpair");
-
-	pid = fork();
-	if (pid == -1)
-		err(EXIT_FAILURE, "fork");
-
-	if (pid == 0) {
-		/*
-		 * CHILD – network worker.
-		 *
-		 * Inherited but immediately closed:
-		 *   sv[1] – parent's socketpair endpoint
-		 *   stdin, stdout – not used
-		 *
-		 * Retained:
-		 *   stderr   – for error reporting
-		 *   sv[0]    – IPC channel to parent
-		 */
-		close(sv[1]);
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-
-		if (unveil_child() == -1)
-			_exit(1);
-
-		if (pledge("stdio inet dns", NULL) == -1)
-			err(EXIT_FAILURE, "pledge (child)");
-		/*
-		 * Child promises (REQUIRES RUNTIME VERIFICATION):
-		 *   stdio  – read/write on the IPC socketpair,
-		 *            memory allocation, string formatting
-		 *   inet   – TCP sockets for HTTP to ifconfig.me
-		 *   dns    – getaddrinfo() for ifconfig.me
-		 *
-		 * Not retained:
-		 *   rpath, wpath, cpath – no filesystem access
-		 *                         beyond DNS helpers
-		 *   unix  – no X11 or local sockets (AF_UNIX
-		 *           socketpair inherited from parent)
-		 *   sysctl, ioctl, route – no kernel queries
-		 *   proc, exec – no child processes
-		 *   id, getpw – no user database access
-		 */
-
-		network_worker(sv[0]);
-		_exit(0);
-	}
-
-	/*
-	 * PARENT – from here onward.
-	 *
-	 * sv[1] is the parent's IPC endpoint to the child.
-	 * sv[0] is unused in the parent.
-	 */
-	close(sv[0]);
-
-	if (unveil_parent(config_path) == -1) {
-		close(sv[1]);
-		free(config_path);
-		return 1;
-	}
-
-	/*
-	 * Initial pledge: everything needed for startup
-	 * (config reading, X11 display open, window creation).
-	 *
-	 * Promises retained during init:
-	 *   stdio  – basic I/O, memory allocation
-	 *   rpath  – fopen(config_path), access(/dev/apm)
-	 *   unix   – XOpenDisplay, X11 protocol
-	 *
-	 * Promises NOT included in init pledge:
-	 *   inet, dns  – network delegated to child
-	 *   sysctl      – only needed in steady state
-	 *   ioctl       – only needed in steady state
-	 *   route       – only needed in steady state
-	 *   proc        – fork already completed
-	 *   exec, id, getpw – never needed
-	 */
-	if (pledge("stdio rpath unix", NULL) == -1) {
-		warn("pledge (init)");
-		close(sv[1]);
-		free(config_path);
-		return 1;
-	}
-	/*
-	 * Init pledge (REQUIRES RUNTIME VERIFICATION):
-	 *   "stdio rpath unix"
-	 */
-
-	struct Config config = config_file(config_path);
+	config = config_file(config_path);
 	free(config_path);
+	if (config.logo == NULL)
+		errx(EXIT_FAILURE, "No logo configured");
 
-	if (config.logo == NULL) {
-		warnx("No logo configured");
-		close(sv[1]);
+	/* The network worker exists only when the widget is enabled. */
+	if (config.show_net) {
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
+			err(EXIT_FAILURE, "socketpair");
+		pid = fork();
+		if (pid == -1)
+			err(EXIT_FAILURE, "fork");
+		if (pid == 0) {
+			close(sv[1]);
+			close(STDIN_FILENO);
+			close(STDOUT_FILENO);
+			if (unveil_child() == -1)
+				_exit(1);
+			if (pledge("stdio inet dns", NULL) == -1)
+				err(EXIT_FAILURE, "pledge (network worker)");
+			network_worker(sv[0]);
+			_exit(0);
+		}
+		close(sv[0]);
+		sv[0] = -1;
+	}
+
+	authority_path = resolve_xauthority_path();
+	if (unveil_parent(authority_path, config.show_bat) == -1) {
+		if (sv[1] != -1)
+			close(sv[1]);
+		free(authority_path);
+		free_config(&config);
 		return 1;
 	}
+	free(authority_path);
 
 	display = XOpenDisplay(NULL);
 	if (display == NULL) {
 		warnx("Cannot open display");
-		close(sv[1]);
+		if (sv[1] != -1)
+			close(sv[1]);
+		free_config(&config);
 		return 1;
 	}
 	screen = DefaultScreen(display);
 
 	load_xresources(display, &config);
 	create_window(display, &window, &gc, screen, &config);
+	if (config.show_cpu)
+		update_cpu_avg_speed();
 
-	/*
-	 * Reduce to the minimal steady‑state pledge set derived
-	 * from the configuration.  This drops rpath unless
-	 * show_bat is enabled (access to /dev/apm).  inet and
-	 * dns are already absent; network is handled by the child.
-	 */
-	build_pledge(steadystr, sizeof(steadystr), &config);
-	if (pledge(steadystr, NULL) == -1)
-		err(EXIT_FAILURE, "pledge (steady)");
-	/*
-	 * Steady‑state pledge (REQUIRES RUNTIME VERIFICATION):
-	 *   Always:    "stdio unix"
-	 *   +sysctl    if show_cpu or show_mem
-	 *   +rpath ioctl if show_bat
-	 *   +route     if show_vpn or show_net
-	 */
-
-	printf("\e[?25l");
+	/* APM_IOC_GETPOWER is not available under any pledge promise. */
+	if (config.show_bat) {
+		warnx("bat=yes: parent pledge disabled; unveil remains active");
+	} else {
+		build_pledge(steadystr, sizeof(steadystr), &config);
+		if (pledge(steadystr, NULL) == -1)
+			err(EXIT_FAILURE, "pledge (display process)");
+	}
 
 	int ip_update_counter = 0;
 
@@ -1204,8 +1217,6 @@ main(int argc, const char *argv[])
 
 		if (config.show_cpu) {
 			update_cpu_temp();
-			update_cpu_avg_speed();
-			update_cpu_base_speed();
 			snprintf(buffer + strlen(buffer),
 			    sizeof(buffer) - strlen(buffer), " CPU: %s (%s) ",
 			    cpu_avg_speed, cpu_temp);
@@ -1216,7 +1227,7 @@ main(int argc, const char *argv[])
 		if (config.show_mem) {
 			free_memory = update_mem();
 			snprintf(buffer + strlen(buffer),
-			    sizeof(buffer) - strlen(buffer), " Mem: %.0llu MB ",
+			    sizeof(buffer) - strlen(buffer), " Mem: %llu MB ",
 			    free_memory);
 			snprintf(buffer + strlen(buffer),
 			    sizeof(buffer) - strlen(buffer), "|");
@@ -1278,7 +1289,10 @@ main(int argc, const char *argv[])
 		usleep(2000000);
 	}
 
-	close(sv[1]);
+	if (sv[1] != -1)
+		close(sv[1]);
+	XFreeGC(display, gc);
+	XDestroyWindow(display, window);
 	free_config(&config);
 	XCloseDisplay(display);
 	return 0;

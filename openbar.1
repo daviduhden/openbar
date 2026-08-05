@@ -1,4 +1,4 @@
-.Dd $Mdocdate: August 1 2026$
+.Dd $Mdocdate: August 5 2026 $
 .Dt OPENBAR 1
 .Os
 .Sh NAME
@@ -40,7 +40,7 @@ if it exists
 .El
 .Sh PROCESS ARCHITECTURE
 .Nm
-runs as two processes on
+runs as one or two processes on
 .Ox :
 .Bl -tag -width Ds
 .It Main process
@@ -48,7 +48,8 @@ Reads configuration, manages the X11 window, and queries
 kernel interfaces for CPU, memory, load, battery, and
 network interface statistics.
 .It Network worker
-A child process forked before sandboxing.
+When public network information is enabled, a child process is forked
+before sandboxing.
 It fetches public IPv4 and IPv6 addresses from
 .Pa ifconfig.me
 over HTTP and returns validated results to the main
@@ -80,7 +81,7 @@ System-wide configuration.
 .El
 .Sh SECURITY
 .Ss Sandboxing
-Both processes use
+The network worker and, except as noted below, the display process use
 .Xr pledge 2
 and
 .Xr unveil 2
@@ -91,13 +92,16 @@ to limit permitted system calls and filesystem visibility.
 Filesystem visibility is locked to:
 .Bl -bullet -compact
 .It
-the configuration file (read-only)
-.It
 .Pa /tmp/.X11-unix
 .Pq read-write, X11 socket
 .It
+.Ev XAUTHORITY
+or
+.Pa ~/.Xauthority
+.Pq read-only, when the file exists
+.It
 .Pa /dev/apm
-.Pq read-only, only if the device node exists
+.Pq read-only, only if battery display is enabled and the node exists
 .El
 .Pp
 The steady-state
@@ -105,50 +109,52 @@ The steady-state
 set is derived from the enabled configuration options:
 .Bl -tag -width Ds
 .It Dq stdio unix
-Always required for basic I/O and X11.
-.It Dq sysctl
+Used for basic I/O and the already-open X11 connection.
+.It Dq vminfo
 Added when
-.Ar cpu
-or
 .Ar mem
-is enabled.
-.It Dq rpath ioctl
-Added when
-.Ar bat
-is enabled
-.Po access to
-.Pa /dev/apm
-.Pc .
+is enabled because
+.Dv VM_UVMEXP
+requires it.
 .It Dq route
 Added when
-.Ar vpn
-or
 .Ar net
-is enabled
-.Po
+or
+.Ar vpn
+is enabled because
 .Xr getifaddrs 3
-.Pc .
+uses
+.Dv NET_RT_IFLIST .
 .El
 .Pp
-The init pledge
-.Dq stdio rpath unix
-is reduced to the steady-state set after reading the
-configuration file and creating the X11 window.
-.Nm
-never retains
-.Dq inet ,
-.Dq dns ,
+Configuration and X11 initialization occur before a single, reducing
+.Xr pledge 2
+call; a later call cannot add promises.
+The CPU MHz selector is read once before pledge, while
+.Dv HW_SENSORS
+is always permitted.
+There are no generic
+.Dq sysctl
 or
-.Dq exec
-in the main process.
+.Dq ioctl
+promises.
+.Pp
+No pledge promise permits repeated
+.Dv APM_IOC_GETPOWER
+operations.
+When
+.Ar bat
+is enabled, the display process therefore remains unpledged and prints a
+warning; its unveil policy is still locked.
 .Ss Network worker
 The worker runs under
 .Dq stdio inet dns
 with filesystem visibility locked to
 .Pa /etc/hosts ,
 .Pa /etc/resolv.conf ,
+.Pa /etc/services ,
 and
-.Pa /etc/services
+.Pa /etc/protocols
 .Pq all read-only .
 It has no access to the X11 display, system configuration,
 battery device, or any kernel interface.
@@ -184,22 +190,21 @@ All sandbox restrictions are applied in the child before
 any network I/O, and in the parent before the main event
 loop.
 .Ss Limitations
-All
-.Xr pledge 2
-promises and
-.Xr unveil 2
-paths documented above require runtime verification
-through
-.Xr ktrace 1 ,
-regression tests, and realistic workloads on a real
+Public addresses are obtained over unencrypted HTTP and are informational.
+The response is bounded and parsed with
+.Xr inet_pton 3
+before display.
+The policies have been checked statically against the current
 .Ox
-system.
-None of the policies have been verified through execution tracing.
+manuals and source, but still require runtime regression testing on real
+hardware.
 .Sh SEE ALSO
 .Xr cwm 1 ,
 .Xr pledge 2 ,
 .Xr unveil 2 ,
-.Xr openbar.conf 5
+.Xr apm 4 ,
+.Xr openbar.conf 5 ,
+.Xr X 7
 .Sh AUTHORS
 .An Gonzalo Rodriguez
 .Aq Mt gonzalo@x61.sh

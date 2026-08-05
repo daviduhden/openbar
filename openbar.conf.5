@@ -1,4 +1,4 @@
-.Dd $Mdocdate: August 1 2026$
+.Dd $Mdocdate: August 5 2026 $
 .Dt OPENBAR.CONF 5
 .Os
 .Sh NAME
@@ -27,6 +27,11 @@ option of
 Each line is a
 .Ar key Ns = Ns Ar value
 pair.
+Leading and trailing whitespace is ignored.
+Empty lines and full lines whose first non-whitespace character is
+.Sq #
+are ignored.
+Keys are matched exactly, and unknown keys produce a warning.
 Boolean features accept
 .Dq yes
 or
@@ -71,10 +76,10 @@ System-wide configuration.
 .El
 .Sh EXAMPLES
 .Bd -literal -offset indent
-logo=openbar
+logo=openbar status
 date=yes
 cpu=yes
-bat=yes
+bat=no
 mem=yes
 load=yes
 net=yes
@@ -87,50 +92,55 @@ The enabled features directly affect the
 .Xr pledge 2
 promise set retained by the main process during
 steady-state operation.
-Enabling
-.Ar bat
-adds
-.Dq rpath ioctl
-.Po for
-.Pa /dev/apm
-.Pc ,
-.Ar cpu
-or
+The normal set is
+.Dq stdio unix ;
 .Ar mem
-adds
-.Dq sysctl ,
-and
+adds the valid
+.Dq vminfo
+promise for
+.Dv VM_UVMEXP .
 .Ar vpn
 or
 .Ar net
 adds
 .Dq route
-.Po for
+because
 .Xr getifaddrs 3
-.Pc .
-Disabling unneeded features reduces the authority available
-to a compromised main process.
+uses
+.Dv NET_RT_IFLIST .
+CPU MHz is sampled before pledge, and
+.Dv HW_SENSORS
+is always allowed.
+There are no generic
+.Dq sysctl ,
+.Dq ioctl
+promises.
 .Pp
-The network worker is always forked when
+The
+.Dv APM_IOC_GETPOWER
+operation used for battery updates is not available under any pledge promise.
+For this reason,
+.Ar bat Ns =yes
+disables pledge in the display process with a warning, while its unveil policy
+remains active.
+.Pp
+The network worker is forked only when
 .Ar net
 is enabled and runs under an independent sandbox with
 .Dq stdio inet dns
 and filesystem visibility limited to DNS resolution
 files.
 .Pp
-The configuration file path must be unveiled before
-the
-.Xr unveil 2
-lock; late access to undeclared paths is rejected with a
-diagnostic.
-All paths listed here require runtime verification
-on a real
-.Ox
-system.
+The configuration is read before sandbox setup.
+The display process unveils its X11 socket and X authority file; it also
+unveils
+.Pa /dev/apm
+when required.
 .Sh SEE ALSO
 .Xr openbar 1 ,
 .Xr pledge 2 ,
-.Xr unveil 2
+.Xr unveil 2 ,
+.Xr apm 4
 .Sh AUTHORS
 .An Gonzalo Rodriguez
 .Aq Mt gonzalo@x61.sh
