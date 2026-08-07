@@ -131,7 +131,6 @@ static const char *color_defaults[] = {
 	"#FC8814",		/* BAR_URGENT */
 };
 
-static void	*xmalloc(size_t);
 static void	*xcalloc(size_t, size_t);
 
 static void *
@@ -151,18 +150,6 @@ xcalloc(size_t no, size_t siz)
 static char	*xstrdup(const char *);
 static void	 config_free(struct Config *);
 static void	 config_setstr(char **, const char *);
-
-static void *
-xmalloc(size_t siz)
-{
-	void	*p;
-
-	if (siz == 0)
-		errx(1, "xmalloc: zero size");
-	if ((p = malloc(siz)) == NULL)
-		err(1, "malloc");
-	return p;
-}
 
 static char *
 xstrdup(const char *str)
