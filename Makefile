@@ -2,8 +2,8 @@
 CC = clang
 CFLAGS = -O2 -pipe
 CFLAGS += -Wall -Wextra -std=c99
-CPPFLAGS += -I/usr/X11R6/include -I${SOURCE_DIR}
-LDLIBS += -L/usr/X11R6/lib -lX11 -lXft
+CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2 -I${SOURCE_DIR}
+LDLIBS += -L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
 OPTFLAGS = -O3
 DBGFLAGS = -O0 -g
 INFO = ==>
