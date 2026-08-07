@@ -133,21 +133,6 @@ static const char *color_defaults[] = {
 
 static void	*xmalloc(size_t);
 static void	*xcalloc(size_t, size_t);
-static char	*xstrdup(const char *);
-static void	 config_free(struct Config *);
-static void	 config_setstr(char **, const char *);
-
-static void *
-xmalloc(size_t siz)
-{
-	void	*p;
-
-	if (siz == 0)
-		errx(1, "xmalloc: zero size");
-	if ((p = malloc(siz)) == NULL)
-		err(1, "malloc");
-	return p;
-}
 
 static void *
 xcalloc(size_t no, size_t siz)
@@ -163,11 +148,29 @@ xcalloc(size_t no, size_t siz)
 	return p;
 }
 
+static char *xstrdup(const char *);
+static void	 config_free(struct Config *);
+static void	 config_setstr(char **, const char *);
+
+static void *
+xmalloc(size_t siz)
+{
+	void	*p;
+
+	if (siz == 0)
+		errx(1, "xmalloc: zero size");
+	if ((p = malloc(siz)) == NULL)
+		err(1, "malloc");
+	return p;
+}
+
 static char *
 xstrdup(const char *str)
 {
 	char	*p;
 
+	if (str == NULL)
+		errx(1, "xstrdup: NULL pointer");
 	if ((p = strdup(str)) == NULL)
 		err(1, "strdup");
 	return p;
@@ -889,7 +892,7 @@ xft_colors_alloc(Display *display, int screen, const struct Config *config)
 	Visual		*visual;
 	Colormap	 colormap;
 
-	colors = xmalloc(COLOR_NITEMS * sizeof(XftColor));
+	colors = xcalloc(COLOR_NITEMS, sizeof(XftColor));
 	visual = DefaultVisual(display, screen);
 	colormap = DefaultColormap(display, screen);
 
