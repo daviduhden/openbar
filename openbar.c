@@ -907,7 +907,7 @@ xft_colors_alloc(Display *display, int screen, const struct Config *config)
 static void
 xft_colors_free(Display *display, int screen, XftColor *colors)
 {
-	unsigned int	i;
+	unsigned int	 i;
 	Visual		*visual;
 	Colormap	 colormap;
 
