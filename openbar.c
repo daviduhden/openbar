@@ -255,7 +255,7 @@ resolve_config_path(const char *override_path)
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0') {
 		length = snprintf(buffer, sizeof(buffer),
-		    "%s/.openbarrc", home);
+			 "%s/.openbarrc", home);
 		if (length > 0 && (size_t)length < sizeof(buffer) &&
 		    access(buffer, R_OK) == 0)
 			return xstrdup(buffer);
@@ -342,10 +342,10 @@ config_load(const char *config_file_path)
 			int gaps[4], n;
 			n = 0;
 			for (token = strtok_r(argument, " \t", &saveptr);
-			    token != NULL && n < 4;
-			    token = strtok_r(NULL, " \t", &saveptr)) {
+			     token != NULL && n < 4;
+			     token = strtok_r(NULL, " \t", &saveptr)) {
 				gaps[n] = (int)strtonum(token, 0, INT_MAX,
-				    &errstr);
+					  &errstr);
 				if (errstr != NULL) {
 					warnx("Invalid gap value");
 					goto fail;
@@ -515,7 +515,7 @@ update_public_ip(void)
 	size_t	total_bytes_received = 0;
 	for (;;) {
 		bytes_received = recv(sockfd, buffer + total_bytes_received,
-		    sizeof(buffer) - 1 - total_bytes_received, 0);
+				 sizeof(buffer) - 1 - total_bytes_received, 0);
 		if (bytes_received > 0) {
 			total_bytes_received += (size_t)bytes_received;
 			continue;
@@ -606,7 +606,7 @@ update_public_ipv6(void)
 	size_t	total_bytes_received = 0;
 	for (;;) {
 		bytes_received = recv(sockfd, buffer + total_bytes_received,
-		    sizeof(buffer) - 1 - total_bytes_received, 0);
+				 sizeof(buffer) - 1 - total_bytes_received, 0);
 		if (bytes_received > 0) {
 			total_bytes_received += (size_t)bytes_received;
 			continue;
@@ -919,10 +919,10 @@ create_window(Display *display, Window *window, XftDraw **xftdraw, int screen,
 	Visual		*visual;
 
 	*window = XCreateSimpleWindow(display, RootWindow(display, screen),
-	    config->gap.left, config->gap.top,
-	    window_width - config->gap.left - config->gap.right,
-	    window_height, 0,
-	    BlackPixel(display, screen), WhitePixel(display, screen));
+		  config->gap.left, config->gap.top,
+		  window_width - config->gap.left - config->gap.right,
+		  window_height, 0,
+		  BlackPixel(display, screen), WhitePixel(display, screen));
 
 	XSelectInput(display, *window, ExposureMask | KeyPressMask);
 
@@ -1218,7 +1218,7 @@ main(int argc, const char *argv[])
 	if (xftfont == NULL) {
 		warnx("Cannot open font: %s", config.fontname);
 		xftfont = XftFontOpenName(display, screen,
-		    "sans-serif:pixelsize=14:bold");
+			  "sans-serif:pixelsize=14:bold");
 		if (xftfont == NULL) {
 			XCloseDisplay(display);
 			xft_colors_free(display, screen, xftcolor);
