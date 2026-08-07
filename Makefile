@@ -10,9 +10,9 @@ INFO = ==>
 
 # Targets
 TARGET = openbar
-SOURCE_DIR := ${.PARSEDIR}
-SOURCE = ${SOURCE_DIR}/openbar.c
-BUILD_TARGET = ${SOURCE_DIR}/${TARGET}
+SOURCE_DIR = .
+SOURCE = openbar.c
+BUILD_TARGET = ${TARGET}
 BINDIR = /usr/local/bin
 MANDIR = /usr/local/man
 INSTALLTARGET = ${BINDIR}/${TARGET}
