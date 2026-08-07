@@ -148,7 +148,7 @@ xcalloc(size_t no, size_t siz)
 	return p;
 }
 
-static char *xstrdup(const char *);
+static char	*xstrdup(const char *);
 static void	 config_free(struct Config *);
 static void	 config_setstr(char **, const char *);
 
