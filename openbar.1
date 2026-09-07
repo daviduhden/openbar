@@ -1,4 +1,4 @@
-.Dd $Mdocdate: August 5 2026 $
+.Dd $Mdocdate: September 7 2026 $
 .Dt OPENBAR 1
 .Os
 .Sh NAME
@@ -8,6 +8,7 @@
 .Nm
 .Op Fl 1
 .Op Fl c Ar path
+.Op Fl h
 .Sh DESCRIPTION
 .Nm
 is a status bar designed for
@@ -15,7 +16,7 @@ is a status bar designed for
 and other X11 window managers.
 It displays system information including CPU speed and temperature,
 free memory, load average, battery status, public and private
-IP addresses, and VPN connection status.
+IP addresses, and WireGuard VPN status.
 .Pp
 Its visual style, colour palette and configuration syntax are
 modelled after
@@ -30,6 +31,8 @@ Run one update cycle and exit.
 Use the configuration file at
 .Ar path
 instead of the default.
+.It Fl h
+Print a usage message and exit.
 .El
 .Pp
 Configuration is loaded from, in order:
@@ -37,33 +40,87 @@ Configuration is loaded from, in order:
 .It
 the file passed with
 .Fl c
+.Pq which must exist
 .It
 .Pa ~/.openbarrc
-if it exists
+if it exists and is readable
 .It
 .Pa /etc/openbarrc
 .El
+.Pp
+See
+.Xr openbarrc 5
+for the configuration format.
 .Sh PROCESS ARCHITECTURE
 .Nm
 runs as one or two processes on
 .Ox :
 .Bl -tag -width Ds
 .It Main process
-Reads configuration, manages the X11 window, and queries
-kernel interfaces for CPU, memory, load, battery, and
-network interface statistics.
+Reads configuration, manages the X11 window, and queries kernel
+interfaces for CPU, memory, load, battery, host name and network
+interface statistics.
 .It Network worker
 When public network information is enabled, a child process is forked
 before sandboxing.
-It fetches public IPv4 and IPv6 addresses from
-.Pa ifconfig.me
-over HTTP and returns validated results to the main
-process through a bounded
+It is the only process retaining
+.Dq inet
+and
+.Dq dns ;
+it fetches the public IPv4 and IPv6 addresses from
+.Pa https://ifconfig.me
+over HTTPS using
+.Xr tls_init 3 ,
+validates the responses with
+.Xr inet_pton 3 ,
+and reports them to the main process through a bounded
 .Xr socketpair 2
 protocol.
-The worker has no access to X11, the configuration file,
-battery or sensor devices, or any other parent resource.
+The worker has no access to X11, the configuration file, battery or
+sensor devices, or any other parent resource.
 .El
+.Sh WIDGETS
+The following widgets can be enabled with
+.Ic show :
+.Bl -tag -width Ds -compact
+.It hostname
+System host name.
+.It date
+Current date and time, updated at minute boundaries.
+.It cpu
+CPU clock speed and temperature.
+The clock speed is read from
+.Xr sysctl 2
+.Va hw.cpuspeed
+once at startup, before
+.Xr pledge 2 ,
+because that interface is not pledge-readable; the temperature
+.Va ( hw.sensors )
+is refreshed every five seconds.
+When no CPU temperature sensor exists, an
+.Sq x
+is shown instead.
+.It mem
+Free physical memory in MB, refreshed every two seconds.
+.It load
+1-minute load average, refreshed every two seconds.
+.It bat
+Battery charge percentage, refreshed every thirty seconds.
+The segment switches to the urgent colour when the charge is at or
+below 15%.
+.It net
+Public IPv4, public IPv6 and the private IPv4 address of the
+configured interface.
+The public addresses are refreshed at most every five minutes; the
+private address every ten seconds.
+.It vpn
+WireGuard status, refreshed every ten seconds.
+A tunnel counts as connected when a
+.Sy wg*
+interface is up, running and has an assigned address.
+.El
+.Pp
+All widgets are disabled by default.
 .Sh FILES
 .Bl -tag -width Ds
 .It Pa ~/.openbarrc
@@ -73,7 +130,7 @@ System-wide configuration.
 .El
 .Sh SECURITY
 .Ss Sandboxing
-The network worker and, except as noted below, the display process use
+Both processes use
 .Xr pledge 2
 and
 .Xr unveil 2
@@ -93,81 +150,104 @@ or
 .Pq read-only, when the file exists
 .It
 .Pa /dev/apm
-.Pq read-only, only if battery display is enabled and the node exists
+.Pq read-only, only if the battery widget is enabled and the node exists
+.It
+the fontconfig directories
+.Pa /etc/fonts ,
+.Pa /var/cache/fontconfig ,
+.Pa /usr/X11R6/lib/X11/fonts ,
+.Pa /usr/local/share/fonts ,
+.Pa ~/.fonts ,
+.Pa ~/.local/share/fonts
+and
+.Pa ~/.cache/fontconfig
+.Pq read-only, only those that exist .
+Needed for lazy font fallback after the lock.
 .El
 .Pp
 The steady-state
 .Xr pledge 2
-set is derived from the enabled configuration options:
+set is derived from the enabled widgets:
 .Bl -tag -width Ds
-.It Dq stdio unix
-Used for basic I/O and the already-open X11 connection.
+.It Dq stdio rpath
+Basic I/O, timing, the already-open X11 connection and IPC, and
+font file access bounded by the unveil policy.
 .It Dq vminfo
-Added when
-.Ar mem
-is enabled because
+Added when the memory widget is enabled because
 .Dv VM_UVMEXP
 requires it.
 .It Dq route
-Added when
-.Ar net
-or
-.Ar vpn
-is enabled because
+Added when the network or VPN widget is enabled because
 .Xr getifaddrs 3
 uses
 .Dv NET_RT_IFLIST .
 .El
 .Pp
-No pledge promise permits repeated
-.Dv APM_IOC_GETPOWER
-operations.
-When
-.Ar bat
-is enabled, the display process therefore remains unpledged and prints a
+No pledge promise permits
+.Dv APM_IOC_GETPOWER .
+When the battery widget is enabled and
+.Pa /dev/apm
+exists, the display process therefore remains unpledged and prints a
 warning; its unveil policy is still locked.
 .Ss Network worker
 The worker runs under
 .Dq stdio inet dns
 with filesystem visibility locked to
-.Pa /etc/hosts ,
 .Pa /etc/resolv.conf ,
-.Pa /etc/services ,
+.Pa /etc/hosts
 and
-.Pa /etc/protocols
+.Pa /etc/ssl/cert.pem
 .Pq all read-only .
+The service port is numeric, so
+.Pa /etc/services
+is never consulted.
 .Ss IPC protocol
-Communication between parent and child uses a fixed-size
-message structure over
-.Xr socketpair 2 .
-The parent sends a one-byte fetch command; the child
-responds with a bounded 112-byte response containing
+Communication between parent and child uses a fixed-size message
+structure over
+.Xr socketpair 2 :
+the parent sends a one-byte fetch command, and the child responds
+with a bounded 65-byte frame containing a magic byte, per-family
 status codes and the address strings.
-.Ss Descriptor isolation
-The child closes its standard input, standard output, and
-the parent's socketpair endpoint immediately after
-.Xr fork 2 .
-The parent closes the child's socketpair endpoint.
-No file descriptors cross the
-.Xr exec 3
-boundary
-.Pq the child never calls exec .
-.Ss Privilege dropping
-.Nm
-runs as the invoking user; no setuid, privilege escalation,
-or
-.Xr chroot 2
-is performed.
-.Ss Limitations
-Public addresses are obtained over unencrypted HTTP and are informational.
-The response is bounded and parsed with
+The parent validates the magic byte, the status codes and both
+addresses with
 .Xr inet_pton 3
 before display.
+.Ss Network behaviour
+Public addresses are fetched over HTTPS; TLS authenticates the
+service, so an on-path attacker cannot substitute another address
+without a valid certificate.
+The response is bounded and must be exactly one syntactically valid
+address of the requested family; anything else is rejected.
+The endpoint is rate-limited to one request per five minutes.
+.Pp
+A DNS, connection or TLS failure shows
+.Dq N/A
+and is retried at the next interval; the bar keeps running.
+If the worker fails permanently it is not restarted (restarting would
+require the
+.Dq proc
+promise in the display process) and public addresses remain
+.Dq N/A
+until the bar is restarted.
+.Ss Limitations
+.Xr pledge 2
+and
+.Xr unveil 2
+restrict this process; they do not make the X11 server itself a
+strong isolation boundary.
+The bar necessarily talks to the user's X server, whose security is
+that of the X11 protocol.
+.Nm
+runs as the invoking user; no setuid, privilege escalation or
+.Xr chroot 2
+is performed.
 .Sh SEE ALSO
 .Xr cwm 1 ,
 .Xr pledge 2 ,
 .Xr unveil 2 ,
+.Xr tls_init 3 ,
 .Xr apm 4 ,
+.Xr wg 4 ,
 .Xr openbarrc 5 ,
 .Xr X 7
 .Sh AUTHORS

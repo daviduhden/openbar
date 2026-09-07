@@ -1,4 +1,4 @@
-.Dd $Mdocdate: August 5 2026 $
+.Dd $Mdocdate: September 7 2026 $
 .Dt OPENBARRC 5
 .Os
 .Sh NAME
@@ -12,17 +12,18 @@ configuration file.
 The configuration syntax follows the keyword style of
 .Xr cwm 1 ,
 with directives separated by whitespace from their arguments.
-Comments can be placed anywhere in the file using a hash mark
-.Pq Sq # ,
-and extend to the end of the current line.
-.Pp
-Arguments containing whitespace should be surrounded by double quotes
-.Pq \&" .
+Comment lines start with a hash mark
+.Pq Sq # .
+Arguments containing whitespace should be surrounded by double
+.Pq \&"
+or single
+.Pq '
+quotes; a quoted argument must not be followed by other characters.
 .Pp
 The following options are accepted:
 .Bl -tag -width Ds
 .It Ic barheight Ar pixels
-Set the height of the status bar in pixels.
+Set the height of the status bar in pixels, between 12 and 60.
 The default is 24.
 .It Ic color barbg Ar color
 Set the background colour of the bar.
@@ -36,7 +37,8 @@ colour of the bar.
 The default is
 .Dq #000000 .
 .It Ic color urgent Ar color
-Set the colour reserved for urgent or warning elements.
+Set the colour used for urgent elements (currently the battery
+segment at or below 15% charge).
 The default is
 .Dq #FC8814
 .Pq the cwm urgency border colour .
@@ -52,15 +54,18 @@ The default is
 .Pq the same default font as cwm .
 .It Ic gap Ar top bottom left right
 Define a gap in pixels at each edge of the screen.
-The bar window is placed within this gap so that it does not
-overlap other screen-edge elements.
+Exactly four non-negative values are required.
+The bar window is placed within this gap so that it does not overlap
+other screen-edge elements.
 The default is
 .Dq 0 0 0 0 .
 .It Ic interface Ar name
-Set the network interface name used to read the private
-IPv4 address.
+Set the network interface name used to read the private IPv4
+address.
+The name must be at most 15 characters and may contain letters,
+digits, underscore, dash and dot.
 .It Ic logo Ar text
-Set the text displayed as the bar logo.
+Set the text displayed as the bar logo, at most 127 characters.
 This field is required.
 .It Ic show Ar widget
 Enable the given status widget.
@@ -90,6 +95,12 @@ Public IPv4, IPv6 and private IPv4 addresses.
 .It vpn
 WireGuard VPN status.
 .El
+.Pp
+All widgets are disabled by default.
+When a directive occurs several times, the last occurrence wins.
+Unknown keywords are reported and ignored; malformed values, unknown
+widget names and unknown colour slots are fatal errors.
+Diagnostics include the file name and line number.
 .Sh FILES
 .Bl -tag -width "~/.openbarrc" -compact
 .It Pa ~/.openbarrc
@@ -118,10 +129,10 @@ show vpn
 hide bat
 .Ed
 .Sh SEE ALSO
-.Xr openbar 1 ,
 .Xr cwm 1 ,
-.Xr cwmrc 5 ,
-.Xr Xft 3
+.Xr openbar 1 ,
+.Xr Xft 3 ,
+.Xr cwmrc 5
 .Sh HISTORY
 The
 .Nm
