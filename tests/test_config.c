@@ -16,10 +16,10 @@
 static char *
 write_conf(const char *content)
 {
-	char	template[] = "/tmp/openbar-conf-XXXXXX";
+	char	 template[] = "/tmp/openbar-conf-XXXXXX";
 	char	*path;
 	FILE	*fp;
-	int	fd;
+	int	 fd;
 
 	fd = mkstemp(template);
 	if (fd == -1) {

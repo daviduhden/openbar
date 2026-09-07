@@ -3,29 +3,29 @@
 # Requires the OpenBSD comp set and Xenocara xbase (libX11, libXft,
 # fontconfig, freetype) plus libtls from base.
 
-CC ?=		cc
-CFLAGS ?=	-O2 -pipe
-CFLAGS +=	-std=c17 -Wall -Wextra -Wpedantic
-CPPFLAGS +=	-I/usr/X11R6/include -I/usr/X11R6/include/freetype2
-LDLIBS +=	-L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
-LDLIBS +=	-ltls
+CC ?= cc
+CFLAGS ?= -O2 -pipe
+CFLAGS += -std=c17 -Wall -Wextra -Wpedantic
+CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
+LDLIBS += -L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
+LDLIBS += -ltls
 
-PREFIX ?=	/usr/local
-BINDIR ?=	$(PREFIX)/bin
-MANDIR ?=	$(PREFIX)/man
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+MANDIR ?= $(PREFIX)/man
 
-PROG =		openbar
-SRCS =		openbar.c config.c fmt.c ipc.c widgets.c net.c
-OBJS =		${SRCS:.c=.o}
+PROG = openbar
+SRCS = openbar.c config.c fmt.c ipc.c widgets.c net.c
+OBJS = ${SRCS:.c=.o}
 
 # The portable units (config.c, fmt.c, ipc.c) have host tests; they
 # depend on nothing outside libc.  The feature-test macros and the
 # strtonum shim exist only for non-OpenBSD test hosts; OpenBSD libc
 # declares everything by default.
-TEST_CPPFLAGS =	-D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
-TEST_SRCS =	tests/test_config.c tests/test_fmt.c tests/test_ipc.c
-TEST_BINS =	${TEST_SRCS:.c=}
-TEST_OBJS =	tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
+TEST_CPPFLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
+TEST_SRCS = tests/test_config.c tests/test_fmt.c tests/test_ipc.c
+TEST_BINS = ${TEST_SRCS:.c=}
+TEST_OBJS = tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
 
 all: ${PROG}
 

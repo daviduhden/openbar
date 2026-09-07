@@ -108,10 +108,10 @@ static void	 draw_line(struct openbar *, struct xstate *);
 static void	 handle_x_events(struct openbar *, struct xstate *);
 static void	 collect_due(struct openbar *);
 static void	 schedule(struct openbar *, enum widget,
-		    const struct timespec *);
+    const struct timespec *);
 static int	 next_timeout_ms(struct openbar *);
 static int	 timespec_cmp(const struct timespec *,
-		    const struct timespec *);
+    const struct timespec *);
 static void	 reap_children(struct openbar *);
 static void	 ipc_tick(struct openbar *);
 static void	 ipc_read(struct openbar *);
@@ -218,7 +218,7 @@ resolve_xauthority(void)
 	}
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
-		size_t	len = strlen(home) + sizeof("/.Xauthority");
+		size_t	 len = strlen(home) + sizeof("/.Xauthority");
 		char	*candidate = malloc(len);
 
 		if (candidate == NULL)
@@ -270,8 +270,8 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 		"/.local/share/fonts",
 		"/.cache/fontconfig",
 	};
-	const char	*home;
-	unsigned int	 i;
+	const char		*home;
+	unsigned int		 i;
 
 	if (unveil("/tmp/.X11-unix", "rw") == -1) {
 		warn("unveil /tmp/.X11-unix");
@@ -289,7 +289,7 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
 		for (i = 0; i < sizeof(user_dirs) / sizeof(user_dirs[0]);
 		    i++) {
-			size_t	len = strlen(home) + strlen(user_dirs[i]) + 1;
+			size_t	 len = strlen(home) + strlen(user_dirs[i]) + 1;
 			char	*path = malloc(len);
 
 			if (path == NULL)
@@ -334,14 +334,14 @@ build_pledge(char *buf, size_t bufsz, const struct conf *c)
 static int
 window_create(struct xstate *x, const struct conf *c)
 {
-	Atom	wm_state, wm_state_above, wm_bypass, wm_type;
-	Atom	wm_type_dock, wm_skip_taskbar, wm_skip_pager, wm_sticky;
-	Atom	wm_state_atoms[4];
+	Atom		wm_state, wm_state_above, wm_bypass, wm_type;
+	Atom		wm_type_dock, wm_skip_taskbar, wm_skip_pager, wm_sticky;
+	Atom		wm_state_atoms[4];
 	unsigned long	bypass = 1;
-	int	sw = DisplayWidth(x->dpy, x->screen);
-	int	sh = DisplayHeight(x->dpy, x->screen);
-	int	w = sw - c->gap[2] - c->gap[3];
-	int	h = c->barheight;
+	int		sw = DisplayWidth(x->dpy, x->screen);
+	int		sh = DisplayHeight(x->dpy, x->screen);
+	int		w = sw - c->gap[2] - c->gap[3];
+	int		h = c->barheight;
 
 	if (w < 1) {
 		warnx("horizontal gaps exceed screen width");
@@ -529,8 +529,8 @@ draw_line(struct openbar *app, struct xstate *x)
 		cx = 0;
 	cy = (x->h + x->font->ascent - x->font->descent) / 2;
 	for (i = 0; i < (unsigned int)nchunks; i++) {
-		const XftColor	*color = chunks[i].urgent
-		    ? &x->colors[COLOR_URGENT] : &x->colors[COLOR_FG];
+		const XftColor	*color = chunks[i].urgent ?
+		    &x->colors[COLOR_URGENT] : &x->colors[COLOR_FG];
 
 		XftDrawStringUtf8(x->draw, color, x->font, cx, cy,
 		    (const FcChar8 *)chunks[i].text,

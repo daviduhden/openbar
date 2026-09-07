@@ -199,8 +199,8 @@ static void
 collect_mem(struct openbar *app)
 {
 	struct uvmexp	uv;
-	int		 mib[2] = {CTL_VM, VM_UVMEXP};
-	size_t		 len = sizeof(uv);
+	int		mib[2] = {CTL_VM, VM_UVMEXP};
+	size_t		len = sizeof(uv);
 
 	if (sysctl(mib, 2, &uv, &len, NULL, 0) == -1) {
 		app->mem_valid = false;
@@ -276,7 +276,7 @@ collect_ifaddrs(struct openbar *app)
 		    (ifa->ifa_flags & IFF_UP) &&
 		    (ifa->ifa_flags & IFF_RUNNING) &&
 		    (ifa->ifa_addr->sa_family == AF_INET ||
-		    ifa->ifa_addr->sa_family == AF_INET6))
+		     ifa->ifa_addr->sa_family == AF_INET6))
 			app->vpn_up = true;
 	}
 	freeifaddrs(ifap);

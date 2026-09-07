@@ -52,7 +52,7 @@ _Static_assert(sizeof(struct net_response) == 65,
 ssize_t
 read_full(int fd, void *buf, size_t n)
 {
-	size_t	left = n;
+	size_t	 left = n;
 	char	*p = buf;
 
 	while (left > 0) {
@@ -75,7 +75,7 @@ read_full(int fd, void *buf, size_t n)
 ssize_t
 write_full(int fd, const void *buf, size_t n)
 {
-	size_t		left = n;
+	size_t		 left = n;
 	const char	*p = buf;
 
 	while (left > 0) {
@@ -108,8 +108,8 @@ ipc_send_fetch(int fd)
 {
 	uint8_t	cmd = IPC_CMD_FETCH;
 
-	return write_full(fd, &cmd, sizeof(cmd)) == (ssize_t)sizeof(cmd)
-	    ? 0 : -1;
+	return write_full(fd, &cmd, sizeof(cmd)) == (ssize_t)sizeof(cmd) ?
+	    0 : -1;
 }
 
 static void
@@ -162,7 +162,8 @@ ipc_decode(const unsigned char *buf, size_t len, struct net_response *out)
 	memcpy(&r, buf, sizeof(r));
 	if (r.magic != IPC_MAGIC)
 		return -1;
-	if (r.status_v4 >= NET_STATUS_NITEMS || r.status_v6 >= NET_STATUS_NITEMS)
+	if (r.status_v4 >= NET_STATUS_NITEMS ||
+	    r.status_v6 >= NET_STATUS_NITEMS)
 		return -1;
 	r.addr_v4[sizeof(r.addr_v4) - 1] = '\0';
 	r.addr_v6[sizeof(r.addr_v6) - 1] = '\0';

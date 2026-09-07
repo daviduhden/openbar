@@ -134,15 +134,15 @@ set_timeouts(int fd)
 static int
 http_fetch(int family, char *out, size_t outlen)
 {
-	struct addrinfo	 hints, *res, *ai;
-	struct tls_config *tls_cfg;
-	struct tls	*ctx;
-	char		 buf[RESPONSE_MAX];
-	const char	 req[] =
+	struct addrinfo		 hints, *res, *ai;
+	struct tls_config	*tls_cfg;
+	struct tls		*ctx;
+	char			 buf[RESPONSE_MAX];
+	const char		 req[] =
 	    "GET /ip HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
-	size_t		 total;
-	int		 sockfd, rc;
-	ssize_t		 n;
+	size_t			 total;
+	int			 sockfd, rc;
+	ssize_t			 n;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = family;
@@ -258,10 +258,10 @@ parse_response(const char *buf, int family, char *out, size_t outlen)
 void
 net_worker(int fd)
 {
-	char		 a4[ADDR4_STRLEN], a6[ADDR6_STRLEN];
-	struct net_response resp;
-	uint8_t		 cmd;
-	int		 s4, s6;
+	char			a4[ADDR4_STRLEN], a6[ADDR6_STRLEN];
+	struct net_response	resp;
+	uint8_t			cmd;
+	int			s4, s6;
 
 	signal(SIGPIPE, SIG_IGN);
 	if (tls_init() == -1)
