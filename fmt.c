@@ -55,7 +55,7 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 		break;
 	case WIDGET_DATE: {
 		char		buf[64];
-		struct tm	 tm;
+		struct tm	tm;
 
 		if (app->now == (time_t)-1 ||
 		    localtime_r(&app->now, &tm) == NULL ||

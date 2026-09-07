@@ -23,7 +23,7 @@ static int	test_failures;
 	const char *_a = (a);					\
 	const char *_b = (b);					\
 	if (_a == NULL || _b == NULL || strcmp(_a, _b) != 0) {	\
-		fprintf(stderr,				\
+		fprintf(stderr,					\
 		    "%s:%d: check failed: \"%s\" != \"%s\"\n",	\
 		    __FILE__, __LINE__,				\
 		    _a == NULL ? "(null)" : _a,			\

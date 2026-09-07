@@ -81,12 +81,12 @@ static char	*xstrdup(const char *);
 static void	 setstr(char **, const char *);
 static int	 conf_parse_line(const char *, size_t, char *, struct conf *);
 static int	 parse_int(const char *, size_t, const char *, long long,
-		    long long, int *);
+    long long, int *);
 static int	 parse_gaps(const char *, size_t, char *, struct conf *);
 static int	 parse_color(const char *, size_t, char *, struct conf *);
 static int	 parse_logo(const char *, size_t, const char *, struct conf *);
 static int	 parse_interface(const char *, size_t, const char *,
-		    struct conf *);
+    struct conf *);
 static char	*strip_quotes(char *, const char **);
 static char	*trim(char *);
 
@@ -475,7 +475,7 @@ conf_resolve_path(const char *override_path)
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0' &&
 	    strlen(home) < HOME_MAX) {
-		size_t	len = strlen(home) + sizeof("/.openbarrc");
+		size_t	 len = strlen(home) + sizeof("/.openbarrc");
 		char	*p = malloc(len);
 
 		if (p == NULL)

@@ -128,55 +128,55 @@ enum ipc_state {
 };
 
 struct openbar {
-	struct conf	 conf;
+	struct conf		conf;
 
 	/* network worker */
-	int		 ipc_fd;
-	pid_t		 ipc_pid;
-	enum ipc_state	 ipc_state;
-	unsigned char	 ipc_rbuf[sizeof(struct net_response)];
-	size_t		 ipc_rlen;
-	struct timespec	 ipc_deadline;
+	int			ipc_fd;
+	pid_t			ipc_pid;
+	enum ipc_state		ipc_state;
+	unsigned char		ipc_rbuf[sizeof(struct net_response)];
+	size_t			ipc_rlen;
+	struct timespec		ipc_deadline;
 
 	/* refresh scheduling, CLOCK_MONOTONIC based */
-	struct timespec	 due[WIDGET_NITEMS];
-	struct timespec	 fetch_due;
+	struct timespec		due[WIDGET_NITEMS];
+	struct timespec		fetch_due;
 
 	/* collected metrics */
-	char		 hostname[HOSTNAME_MAX + 1];
-	time_t		 now;
-	unsigned int	 cpu_mhz;
-	int		 cpu_temp;	/* degrees Celsius */
-	int		 cpu_sensor;	/* 0 unknown, >0 dev+1, -1 none */
-	bool		 cpu_have_freq;
-	bool		 cpu_have_temp;
-	bool		 mem_valid;
-	unsigned long long mem_free_mb;
-	bool		 load_valid;
-	double		 load1;
-	int		 bat_pct;	/* -1 when unavailable */
-	bool		 vpn_up;
-	char		 pub_ip4[ADDR4_STRLEN];
-	char		 pub_ip6[ADDR6_STRLEN];
-	char		 int_ip4[ADDR4_STRLEN];
+	char			hostname[HOSTNAME_MAX + 1];
+	time_t			now;
+	unsigned int		cpu_mhz;
+	int			cpu_temp;	/* degrees Celsius */
+	int			cpu_sensor;	/* 0 unknown, >0 dev+1, -1 none */
+	bool			cpu_have_freq;
+	bool			cpu_have_temp;
+	bool			mem_valid;
+	unsigned long long	mem_free_mb;
+	bool			load_valid;
+	double			load1;
+	int			bat_pct;	/* -1 when unavailable */
+	bool			vpn_up;
+	char			pub_ip4[ADDR4_STRLEN];
+	char			pub_ip6[ADDR6_STRLEN];
+	char			int_ip4[ADDR4_STRLEN];
 
 	/* rendering */
-	struct witem	 seg[WIDGET_NITEMS];
-	char		 bar_text[BAR_TEXT_MAX];
-	bool		 dirty;
+	struct witem		seg[WIDGET_NITEMS];
+	char			bar_text[BAR_TEXT_MAX];
+	bool			dirty;
 
 	/* pre-opened devices */
-	int		 apm_fd;
+	int			apm_fd;
 };
 
 /* config.c */
-void	 conf_defaults(struct conf *);
-void	 conf_free(struct conf *);
-int	 conf_load(const char *, struct conf *);
-char	*conf_resolve_path(const char *);
-int	 widget_lookup(const char *);
+void			 conf_defaults(struct conf *);
+void			 conf_free(struct conf *);
+int			 conf_load(const char *, struct conf *);
+char			*conf_resolve_path(const char *);
+int			 widget_lookup(const char *);
 extern const char *const default_colors[COLOR_NITEMS];
-extern const char default_font[];
+extern const char	 default_font[];
 
 /* ipc.c */
 ssize_t	 read_full(int, void *, size_t);
@@ -184,7 +184,7 @@ ssize_t	 write_full(int, const void *, size_t);
 int	 valid_ip(const char *, int);
 int	 ipc_send_fetch(int);
 void	 ipc_encode(struct net_response *, int, const char *, int,
-	    const char *);
+    const char *);
 int	 ipc_decode(const unsigned char *, size_t, struct net_response *);
 
 /* fmt.c */

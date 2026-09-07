@@ -13,7 +13,7 @@ long long
 strtonum(const char *numstr, long long minval, long long maxval,
     const char **errstrp)
 {
-	long long	ll = 0;
+	long long	 ll = 0;
 	const char	*errmsg = "invalid";
 	char		*ep;
 
