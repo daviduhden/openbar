@@ -1,77 +1,84 @@
-# Compiler and flags
-CC = clang
-CFLAGS = -O2 -pipe
-CFLAGS += -Wall -Wextra -std=c99
-CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2 -I${SOURCE_DIR}
-LDLIBS += -L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
-OPTFLAGS = -O3
-DBGFLAGS = -O0 -g
-INFO = ==>
+# openbar - an OpenBSD status bar for cwm(1) and other X11 window managers.
+#
+# Requires the OpenBSD comp set and Xenocara xbase (libX11, libXft,
+# fontconfig, freetype) plus libtls from base.
 
-# Targets
-TARGET = openbar
-SOURCE_DIR = .
-SOURCE = openbar.c
-BUILD_TARGET = ${TARGET}
-BINDIR = /usr/local/bin
-MANDIR = /usr/local/man
-INSTALLTARGET = ${BINDIR}/${TARGET}
-MAN1 = ${MANDIR}/man1
-MAN5 = ${MANDIR}/man5
+CC ?=		cc
+CFLAGS ?=	-O2 -pipe
+CFLAGS +=	-std=c17 -Wall -Wextra -Wpedantic
+CPPFLAGS +=	-I/usr/X11R6/include -I/usr/X11R6/include/freetype2
+LDLIBS +=	-L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
+LDLIBS +=	-ltls
 
-# Default target to build the project
-.PHONY: all
-all: ${BUILD_TARGET}
+PREFIX ?=	/usr/local
+BINDIR ?=	$(PREFIX)/bin
+MANDIR ?=	$(PREFIX)/man
 
-# Normal build target.
-.PHONY: build
-build: ${BUILD_TARGET}
+PROG =		openbar
+SRCS =		openbar.c config.c fmt.c ipc.c widgets.c net.c
+OBJS =		${SRCS:.c=.o}
 
-${BUILD_TARGET}: ${SOURCE}
-	@echo "${INFO} Building ${TARGET}"
-	@${CC} ${CFLAGS} ${CPPFLAGS} -o ${BUILD_TARGET} ${SOURCE} ${LDFLAGS} ${LDLIBS}
+# The portable units (config.c, fmt.c, ipc.c) have host tests; they
+# depend on nothing outside libc.  The feature-test macros and the
+# strtonum shim exist only for non-OpenBSD test hosts; OpenBSD libc
+# declares everything by default.
+TEST_CPPFLAGS =	-D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
+TEST_SRCS =	tests/test_config.c tests/test_fmt.c tests/test_ipc.c
+TEST_BINS =	${TEST_SRCS:.c=}
+TEST_OBJS =	tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
 
-# Build target with optimization flags
-.PHONY: opt
-opt: clean
-	@echo "${INFO} Building ${TARGET} (opt)"
-	@${CC} ${CFLAGS} ${OPTFLAGS} ${CPPFLAGS} -o ${BUILD_TARGET} ${SOURCE} ${LDFLAGS} ${LDLIBS}
+all: ${PROG}
 
-.PHONY: debug-build
-debug-build: clean
-	@echo "${INFO} Building ${TARGET} (debug)"
-	@${CC} ${CFLAGS} ${DBGFLAGS} ${CPPFLAGS} -o ${BUILD_TARGET} ${SOURCE} ${LDFLAGS} ${LDLIBS}
+${PROG}: ${OBJS}
+	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDLIBS}
 
-# Install target to copy the executable and man pages
-.PHONY: install
-install: ${BUILD_TARGET}
-	@echo "${INFO} Installing ${TARGET} -> ${INSTALLTARGET}" && mkdir -p ${BINDIR} && install -s ${BUILD_TARGET} ${INSTALLTARGET}
-	@echo "${INFO} Installing man pages -> ${MAN1}/openbar.1 and ${MAN5}/openbarrc.5" && mkdir -p ${MAN1} ${MAN5} && install -m 644 ${SOURCE_DIR}/openbar.1 ${MAN1}/openbar.1 && install -m 644 ${SOURCE_DIR}/openbarrc.5 ${MAN5}/openbarrc.5 && echo "${INFO} Install complete"
+.c.o:
+	${CC} ${CFLAGS} ${CPPFLAGS} -c -o $@ $<
 
-# Clean target to remove build artifacts
-.PHONY: clean
-clean:
-	@echo "${INFO} Cleaning up build artifacts"
-	@rm -f ${BUILD_TARGET}
-	@echo "${INFO} Clean complete"
+${OBJS}: openbar.h
 
-# Uninstall target to remove the installed files
-.PHONY: uninstall
+install: ${PROG}
+	install -d ${DESTDIR}${BINDIR} ${DESTDIR}${MANDIR}/man1 \
+	    ${DESTDIR}${MANDIR}/man5
+	install -m 755 ${PROG} ${DESTDIR}${BINDIR}/${PROG}
+	install -m 644 openbar.1 ${DESTDIR}${MANDIR}/man1/openbar.1
+	install -m 644 openbarrc.5 ${DESTDIR}${MANDIR}/man5/openbarrc.5
+
+# Install the example configuration as /etc/openbarrc, never clobbering
+# an existing file.
+install-conf:
+	test ! -e ${DESTDIR}/etc/openbarrc || \
+	    { echo "/etc/openbarrc exists; not overwritten" >&2; exit 1; }
+	install -d ${DESTDIR}/etc
+	install -m 644 openbar.conf ${DESTDIR}/etc/openbarrc
+
 uninstall:
-	@echo "${INFO} Removing ${INSTALLTARGET}" && rm -f ${INSTALLTARGET}
-	@echo "${INFO} Removing man pages" && rm -f ${MAN1}/openbar.1 ${MAN5}/openbarrc.5 && echo "${INFO} Uninstall complete"
+	rm -f ${DESTDIR}${BINDIR}/${PROG}
+	rm -f ${DESTDIR}${MANDIR}/man1/openbar.1 \
+	    ${DESTDIR}${MANDIR}/man5/openbarrc.5
 
-# Debug target to run the program in a debugger
-.PHONY: debug
-debug: debug-build
-	@echo "${INFO} Starting debugger for ${TARGET}"
-	@egdb -q ${BUILD_TARGET} -ex "break main" -ex "run"
+tests/config.o: config.c openbar.h
+	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
+	    -include tests/strtonum.h -c -o $@ config.c
 
-# Help target to display available commands
-.PHONY: help
-help:
-	@printf "Available targets:\n  all        - Build the project\n  build      - Build the project\n  opt        - Build with -O3\n  install    - Install the executable and man pages\n  clean      - Remove build artifacts\n  uninstall  - Remove the installed files\n  debug      - Build with debug symbols and start egdb\n  test       - Report test availability\n"
+tests/fmt.o: fmt.c openbar.h
+	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
+	    -include tests/strtonum.h -c -o $@ fmt.c
 
-.PHONY: test
-test:
-	@echo "${INFO} No automated tests defined"
+tests/ipc.o: ipc.c openbar.h
+	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
+	    -include tests/strtonum.h -c -o $@ ipc.c
+
+tests/test_support.o: tests/test_support.c
+	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -c -o $@ tests/test_support.c
+
+${TEST_BINS}: ${TEST_OBJS} openbar.h tests/test.h
+	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
+
+test: ${TEST_BINS}
+	@for t in ${TEST_BINS}; do echo "==> $$t"; ./$$t || exit 1; done
+
+clean:
+	rm -f ${PROG} ${OBJS} ${TEST_BINS} ${TEST_OBJS}
+
+.PHONY: all install install-conf uninstall test clean
