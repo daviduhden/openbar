@@ -158,7 +158,7 @@ appears in the production build.  Suggested hygiene before committing:
 
 ```sh
 make test
-gcc  -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
+clang -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
      -Wshadow -Wformat=2 -Wundef -Wpointer-arith -Wstrict-prototypes \
      -Wmissing-prototypes -Werror -fsyntax-only config.c fmt.c ipc.c ...
 clang --analyze ...

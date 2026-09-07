@@ -3,7 +3,9 @@
 # Requires the OpenBSD comp set and Xenocara xbase (libX11, libXft,
 # fontconfig, freetype) plus libtls from base.
 
-CC ?= cc
+.SUFFIXES: .c .o
+
+CC ?= clang
 CFLAGS ?= -O2 -pipe
 CFLAGS += -std=c17 -Wall -Wextra -Wpedantic
 CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
@@ -32,10 +34,8 @@ all: ${PROG}
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDLIBS}
 
-.c.o:
+.c.o: openbar.h
 	${CC} ${CFLAGS} ${CPPFLAGS} -c -o $@ $<
-
-${OBJS}: openbar.h
 
 install: ${PROG}
 	install -d ${DESTDIR}${BINDIR} ${DESTDIR}${MANDIR}/man1 \
