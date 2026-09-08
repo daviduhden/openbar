@@ -188,8 +188,10 @@ void	 ipc_encode(struct net_response *, int, const char *, int,
 int	 ipc_decode(const unsigned char *, size_t, struct net_response *);
 
 /* fmt.c */
+int	 locale_init(void);
 void	 fmt_widget(const struct openbar *, enum widget, struct witem *);
 void	 compose_bar(struct openbar *);
+void	 utf8_bounded_copy(char *, const char *, size_t);
 
 /* widgets.c (OpenBSD) */
 void	 collect_widget(struct openbar *, enum widget);

@@ -121,6 +121,38 @@ interface is up, running and has an assigned address.
 .El
 .Pp
 All widgets are disabled by default.
+.Sh LOCALE AND ENCODING
+The
+.Nm
+interface is available only in U.S. English: all diagnostics, messages
+and widget text are written in English, and the program contains no
+translation infrastructure.
+.Pp
+UTF-8 is the only supported character encoding.
+All text drawn by
+.Nm
+is UTF-8, and configuration values such as the logo are treated as
+UTF-8, so user data may contain arbitrary Unicode.
+Legacy encodings such as ISO-8859-1, ISO-8859-15, Windows-1252,
+Shift-JIS, EUC-JP or KOI8-R are not supported.
+.Pp
+The supported locale is
+.Dq en_US.UTF-8 .
+.Nm
+never reads the
+.Ev LANG ,
+.Ev LANGUAGE ,
+.Ev LC_MESSAGES ,
+.Ev LC_ALL
+or any other locale environment variable, so changing them does not
+translate the interface and has no effect on formatting or parsing.
+At startup
+.Nm
+pins the C locale and validates the result, keeping all libc
+formatting deterministic: numbers always use a decimal point, dates
+always use English month and weekday names, and machine-readable
+syntax (configuration directives, IPC framing) is unaffected by the
+environment.
 .Sh FILES
 .Bl -tag -width Ds
 .It Pa ~/.openbarrc

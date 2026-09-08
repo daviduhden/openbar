@@ -36,12 +36,42 @@
 
 #include "openbar.h"
 
+#include <locale.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 /* The cwm-style bar: "logo | widget | widget |". */
 #define SEPARATOR	" |"
+
+/*
+ * English day and month abbreviations for the date widget.  The bar
+ * interface is U.S. English only and must not depend on libc locale
+ * tables, so the names are hard-coded here and strftime(3) is not
+ * used for them.
+ */
+static const char *const day_abbrev[7] = {
+	"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+
+static const char *const month_abbrev[12] = {
+	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+/*
+ * Pin the C locale before anything is formatted or parsed.  openbar
+ * never reads LANG or LC_* and offers no translated interface; the
+ * C locale keeps libc formatting deterministic everywhere: ASCII
+ * decimal point, no digit grouping and English libc diagnostics.
+ * Returns 0, or -1 if the C locale is unavailable (impossible on a
+ * conforming C17 host, but the caller must not continue without it).
+ */
+int
+locale_init(void)
+{
+	return setlocale(LC_ALL, "C") == NULL ? -1 : 0;
+}
 
 void
 fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
@@ -54,15 +84,19 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 		    app->hostname);
 		break;
 	case WIDGET_DATE: {
-		char		buf[64];
 		struct tm	tm;
 
 		if (app->now == (time_t)-1 ||
 		    localtime_r(&app->now, &tm) == NULL ||
-		    strftime(buf, sizeof(buf), "%a %d %b %H:%M", &tm) == 0)
+		    tm.tm_wday < 0 || tm.tm_wday > 6 ||
+		    tm.tm_mon < 0 || tm.tm_mon > 11) {
 			snprintf(out->text, sizeof(out->text), "N/A");
-		else
-			snprintf(out->text, sizeof(out->text), "%s", buf);
+		} else {
+			snprintf(out->text, sizeof(out->text),
+			    "%s %02d %s %02d:%02d", day_abbrev[tm.tm_wday],
+			    tm.tm_mday, month_abbrev[tm.tm_mon],
+			    tm.tm_hour, tm.tm_min);
+		}
 		break;
 	}
 	case WIDGET_CPU:
@@ -121,15 +155,72 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 	}
 }
 
-/* Append src to dst, truncating at the buffer end. */
+/*
+ * Largest prefix of src[0..keep) that ends on a UTF-8 character
+ * boundary: a truncation that would split a multibyte sequence drops
+ * the partial sequence entirely, so the result is always valid UTF-8.
+ */
+static size_t
+utf8_truncate_boundary(const char *src, size_t keep)
+{
+	size_t	i, last = 0;
+
+	for (i = 0; i < keep;) {
+		unsigned char	c = (unsigned char)src[i];
+		size_t		clen, j;
+
+		if (c < 0x80) {
+			i++;
+			last = i;
+			continue;
+		}
+		if (c < 0xC2 || c > 0xF4)
+			break;		/* stray or invalid lead byte */
+		clen = c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+		if (i + clen > keep)
+			break;		/* sequence crosses the limit */
+		for (j = 1; j < clen; j++) {
+			if (((unsigned char)src[i + j] & 0xC0) != 0x80)
+				break;
+		}
+		if (j < clen)
+			break;		/* malformed sequence */
+		i += clen;
+		last = i;
+	}
+	return last;
+}
+
+/*
+ * Append src to dst, truncating at the buffer end without splitting a
+ * UTF-8 sequence, so the rendered line is always valid UTF-8.
+ */
 static void
 bappend(char *dst, size_t dstsz, const char *src)
 {
 	size_t	pos = strlen(dst);
+	size_t	keep = strlen(src);
 
-	if (pos + 1 >= dstsz)
+	if (dstsz == 0 || pos + 1 >= dstsz)
 		return;
-	snprintf(dst + pos, dstsz - pos, "%s", src);
+	if (keep > dstsz - 1 - pos)
+		keep = dstsz - 1 - pos;
+	keep = utf8_truncate_boundary(src, keep);
+	memcpy(dst + pos, src, keep);
+	dst[pos + keep] = '\0';
+}
+
+/*
+ * Copy src into dst as a fresh string, never splitting a UTF-8
+ * sequence at the truncation boundary.  dst must be a valid buffer;
+ * a zero-sized dstsz leaves it untouched.
+ */
+void
+utf8_bounded_copy(char *dst, const char *src, size_t dstsz)
+{
+	if (dstsz > 0)
+		dst[0] = '\0';
+	bappend(dst, dstsz, src);
 }
 
 /*

@@ -1,9 +1,15 @@
 /*
  * Minimal host test framework for the portable openbar units.
+ *
+ * TEST_MAIN() pins the C locale the same way the production program
+ * does, so test results are independent of LANG/LC_* in the host
+ * environment.
  */
 
 #ifndef OPENBAR_TEST_H
 #define OPENBAR_TEST_H
+
+#include "../openbar.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +42,10 @@ static int	test_failures;
 int								\
 main(void)							\
 {								\
+	if (locale_init() == -1) {				\
+		fprintf(stderr, "cannot set the C locale\n");	\
+		return 1;					\
+	}							\
 	run_tests();						\
 	if (test_failures != 0) {				\
 		fprintf(stderr, "%d check(s) failed\n",		\

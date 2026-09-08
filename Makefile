@@ -25,7 +25,8 @@ OBJS = ${SRCS:.c=.o}
 # strtonum shim exist only for non-OpenBSD test hosts; OpenBSD libc
 # declares everything by default.
 TEST_CPPFLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
-TEST_SRCS = tests/test_config.c tests/test_fmt.c tests/test_ipc.c
+TEST_SRCS = tests/test_config.c tests/test_fmt.c tests/test_ipc.c \
+	    tests/test_locale.c
 TEST_BINS = ${TEST_SRCS:.c=}
 TEST_OBJS = tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
 
@@ -75,10 +76,17 @@ tests/test_support.o: tests/test_support.c
 ${TEST_BINS}: ${TEST_OBJS} openbar.h tests/test.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
 
-test: ${TEST_BINS}
+test: ${TEST_BINS} test-locale
 	@for t in ${TEST_BINS}; do echo "==> $$t"; ./$$t || exit 1; done
+
+# Run the suite under a matrix of locale environments (English and
+# translated, UTF-8 and legacy encodings, C/POSIX) and require
+# byte-identical behaviour: the interface language, the decimal
+# separator and the syntax parsing must not change.
+test-locale: ${TEST_BINS}
+	@sh tests/locale_matrix.sh ${TEST_BINS}
 
 clean:
 	rm -f ${PROG} ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
-.PHONY: all install install-conf uninstall test clean
+.PHONY: all install install-conf uninstall test test-locale clean

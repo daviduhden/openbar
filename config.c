@@ -38,7 +38,6 @@
 
 #include "openbar.h"
 
-#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <limits.h>
@@ -98,6 +97,25 @@ xstrdup(const char *str)
 	if ((p = strdup(str)) == NULL)
 		err(1, "strdup");
 	return p;
+}
+
+/*
+ * ASCII predicates for the interface-name grammar.  Interface names
+ * are a fixed, machine-readable syntax: classification must not
+ * depend on the locale, so <ctype.h> is deliberately avoided.
+ */
+static int
+ident_start(unsigned char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+	    c == '_';
+}
+
+static int
+ident_char(unsigned char c)
+{
+	return ident_start(c) || (c >= '0' && c <= '9') || c == '-' ||
+	    c == '.';
 }
 
 static void
@@ -270,15 +288,13 @@ parse_interface(const char *path, size_t lineno, const char *value,
 		    value);
 		return -1;
 	}
-	if (!isalpha((unsigned char)value[0]) && value[0] != '_') {
+	if (!ident_start((unsigned char)value[0])) {
 		warnx("%s:%zu: invalid interface name '%s'", path, lineno,
 		    value);
 		return -1;
 	}
 	for (size_t i = 1; i < len; i++) {
-		unsigned char ch = (unsigned char)value[i];
-
-		if (!isalnum(ch) && ch != '_' && ch != '-' && ch != '.') {
+		if (!ident_char((unsigned char)value[i])) {
 			warnx("%s:%zu: invalid interface name '%s'", path,
 			    lineno, value);
 			return -1;

@@ -32,6 +32,7 @@
  * scheduling, worker supervision and the OpenBSD sandbox.
  *
  * Lifecycle:
+ *   pin the C locale (English interface, deterministic formatting)
  *   parse arguments
  *   -> load configuration
  *   -> fork the network worker (the only process keeping inet/dns)
@@ -63,7 +64,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <locale.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdnoreturn.h>
@@ -775,7 +775,8 @@ main(int argc, char *argv[])
 	strlcpy(app.pub_ip4, "N/A", sizeof(app.pub_ip4));
 	strlcpy(app.pub_ip6, "N/A", sizeof(app.pub_ip6));
 
-	setlocale(LC_ALL, "");
+	if (locale_init() == -1)
+		errx(1, "cannot set the C locale");
 	/* read the zoneinfo file now; later calls use the cached data */
 	tzset();
 

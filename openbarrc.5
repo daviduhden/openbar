@@ -20,6 +20,13 @@ or single
 .Pq '
 quotes; a quoted argument must not be followed by other characters.
 .Pp
+The file is UTF-8 encoded and text values such as
+.Ic logo
+may contain arbitrary Unicode characters.
+Keyword and widget names, diagnostics and all other interface text are
+U.S. English only; locale environment variables have no effect on the
+syntax.
+.Pp
 The following options are accepted:
 .Bl -tag -width Ds
 .It Ic barheight Ar pixels
