@@ -193,6 +193,9 @@ test_invalid(void)
 	expect_fail("logo x\ninterface looooooooooooong0\n");
 	expect_fail("logo x\ninterface \"bad name\"\n");
 	expect_fail("logo x\ninterface 0bad\n");
+	/* interface names are an ASCII grammar, regardless of locale */
+	expect_fail("logo x\ninterface élán0\n");
+	expect_fail("logo x\ninterface wélan0\n");
 	/* missing argument */
 	expect_fail("logo x\ninterface\n");
 	/* logo too long */

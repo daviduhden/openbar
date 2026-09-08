@@ -224,6 +224,72 @@ test_compose(void)
 }
 
 static void
+test_utf8_bounded_copy(void)
+{
+	char	buf[32];
+
+	/* untruncated copy is byte-identical */
+	utf8_bounded_copy(buf, "héllo", sizeof(buf));
+	CHECK_STR(buf, "héllo");
+
+	/* exact fit */
+	utf8_bounded_copy(buf, "héllo", 7);
+	CHECK_STR(buf, "héllo");
+
+	/* truncation on an ASCII boundary */
+	utf8_bounded_copy(buf, "héllo", 6);
+	CHECK_STR(buf, "héll");
+
+	/* truncation in the middle of é drops the whole sequence */
+	utf8_bounded_copy(buf, "héllo", 3);
+	CHECK_STR(buf, "h");
+
+	utf8_bounded_copy(buf, "héllo", 2);
+	CHECK_STR(buf, "h");
+
+	/* truncation right after a lead byte drops the lead byte too */
+	utf8_bounded_copy(buf, "éa", 2);
+	CHECK_STR(buf, "");
+
+	/* complete sequences before the boundary survive */
+	utf8_bounded_copy(buf, "ééé", 5);
+	CHECK_STR(buf, "éé");
+
+	/* a four-byte sequence (U+1F4A9) is kept or dropped whole */
+	utf8_bounded_copy(buf, "a\360\237\222\251b", 6);
+	CHECK_STR(buf, "a\360\237\222\251");
+	utf8_bounded_copy(buf, "a\360\237\222\251b", 5);
+	CHECK_STR(buf, "a");
+
+	/* ASCII truncation is unchanged */
+	utf8_bounded_copy(buf, "abcdef", 4);
+	CHECK_STR(buf, "abc");
+
+	/* empty source */
+	utf8_bounded_copy(buf, "", sizeof(buf));
+	CHECK_STR(buf, "");
+
+	/* zero-sized destination leaves the buffer untouched */
+	strcpy(buf, "unchanged");
+	utf8_bounded_copy(buf, "x", 0);
+	CHECK_STR(buf, "unchanged");
+}
+
+static void
+test_compose_utf8_logo(void)
+{
+	struct openbar	app;
+
+	fresh_app(&app);
+	conf_free(&app.conf);
+	memset(&app.conf, 0, sizeof(app.conf));
+	app.conf.logo = strdup("Café ☕");
+	compose_bar(&app);
+	CHECK_STR(app.bar_text, "Café ☕ |");
+	free(app.conf.logo);
+}
+
+static void
 run_tests(void)
 {
 	setenv("TZ", "UTC0", 1);
@@ -235,6 +301,8 @@ run_tests(void)
 	test_fmt_date();
 	test_fmt_hostname();
 	test_compose();
+	test_utf8_bounded_copy();
+	test_compose_utf8_logo();
 }
 
 TEST_MAIN()

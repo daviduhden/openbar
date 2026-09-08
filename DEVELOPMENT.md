@@ -16,7 +16,7 @@ widgets.c     kernel metric collection: sysctl(2), getifaddrs(3), /dev/apm
 net.c         network worker: HTTPS via libtls, worker sandbox, fork setup
 openbar.c     display process: X11/Xft, event loop, refresh scheduling,
               worker supervision, display-process sandbox
-tests/        host tests for the three portable units
+tests/        host tests for the portable units and the locale policy
 ```
 
 The portable units (`config.c`, `fmt.c`, `ipc.c`) contain only ISO C17 and
@@ -24,6 +24,31 @@ POSIX interfaces available on any test host; they are what `make test`
 compiles and runs.  The OpenBSD units are verified against the real OpenBSD
 and Xenocara headers on the target, but their logic is exercised indirectly
 through the portable units' tests where possible.
+
+## Locale policy
+
+`openbar` follows the OpenBSD base-system approach to locales: one interface
+language (U.S. English), UTF-8 as the only text encoding, and no translation
+machinery.  Concretely:
+
+- `locale_init()` (fmt.c) pins `setlocale(LC_ALL, "C")` at startup and
+  returns an error if the C locale is unavailable; `main()` refuses to run
+  without it.  The C locale keeps libc formatting deterministic: `.`
+  decimal point, no digit grouping, English libc diagnostics.
+- `LANG`, `LANGUAGE`, `LC_ALL`, `LC_MESSAGES` and the other `LC_*`
+  variables are never read; `setlocale(3)` is never called with the
+  environment (`""`) or with a locale name, only with `"C"`.
+- The date widget uses explicit English day/month abbreviation tables in
+  fmt.c rather than `strftime(3)` locale data.
+- The interface-name grammar in config.c uses explicit ASCII predicates
+  instead of locale-sensitive `<ctype.h>` classification.
+- Text is UTF-8 end to end (Xft's `*Utf8` APIs); truncation of the bar
+  line never splits a multibyte sequence (`bappend()` in fmt.c).
+
+The supported environment is `en_US.UTF-8` in the sense that openbar
+behaves identically everywhere: the interface is English, all text is
+UTF-8, and no other locale's conventions (decimal commas, translated
+names, legacy encodings) can ever affect it.
 
 ## State
 
@@ -44,6 +69,7 @@ by async-signal-safe handlers and read in the main loop.
 ## Lifecycle
 
 ```
+locale_init()           pin the C locale; fatal on failure
 parse arguments (getopt)
 -> resolve configuration path ($HOME-aware, then defaults)
 -> load configuration (fatal on malformed values)
@@ -151,10 +177,20 @@ for them.
 make test
 ```
 
-runs the three host test binaries (configuration parsing, IPC codec,
-formatting).  The test build uses `-D_POSIX_C_SOURCE`/`-D_DEFAULT_SOURCE`
-and a `strtonum(3)` shim solely to compile on non-OpenBSD hosts; neither
-appears in the production build.  Suggested hygiene before committing:
+runs the four host test binaries (configuration parsing, IPC codec,
+formatting, locale policy).  The test build uses
+`-D_POSIX_C_SOURCE`/`-D_DEFAULT_SOURCE` and a `strtonum(3)` shim solely to
+compile on non-OpenBSD hosts; neither appears in the production build.
+`TEST_MAIN()` pins the C locale exactly like the production program, so the
+results do not depend on the host environment.
+
+`make test` also runs the locale matrix (`make test-locale`): the test
+binaries are re-run under `LANG=en_US.UTF-8`, `LC_ALL=en_US.UTF-8`,
+`LANG=de_DE.UTF-8`, `LANG=es_ES.UTF-8`, `LC_MESSAGES=fr_FR.UTF-8`,
+`LANG=C`, `LC_ALL=POSIX`, legacy encodings (GBK, KOI8-R, ISO-8859-1) and
+with no locale variables set; stdout, stderr and exit status must be
+byte-identical across all environments.  Suggested hygiene before
+committing:
 
 ```sh
 make test
