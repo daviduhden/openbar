@@ -39,6 +39,7 @@
 #include "openbar.h"
 
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <sys/sensors.h>
 #include <sys/sysctl.h>
 
