@@ -5,7 +5,11 @@
 
 .SUFFIXES: .c .o
 
-CC ?= clang
+# Toolchain: clang(1) to build, lldb(1) to debug.
+CC = clang
+DEBUGGER = lldb
+DBGFLAGS = -O0 -g
+
 CFLAGS ?= -O2 -pipe
 CFLAGS += -std=c17 -Wall -Wextra -Wpedantic
 CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
@@ -31,6 +35,11 @@ TEST_BINS = ${TEST_SRCS:.c=}
 TEST_OBJS = tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
 
 all: ${PROG}
+
+# Rebuild without optimisation, with symbols, and run under lldb.
+debug: clean
+	${MAKE} CFLAGS='${DBGFLAGS} -std=c17 -Wall -Wextra -Wpedantic' ${PROG}
+	${DEBUGGER} ./${PROG}
 
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDLIBS}
@@ -89,4 +98,4 @@ test-locale: ${TEST_BINS}
 clean:
 	rm -f ${PROG} ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
-.PHONY: all install install-conf uninstall test test-locale clean
+.PHONY: all debug install install-conf uninstall test test-locale clean
