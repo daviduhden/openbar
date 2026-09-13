@@ -41,10 +41,10 @@ rebuild:
 	${MAKE} clean
 	${MAKE} ${PROG}
 
-# Rebuild without optimisation, with symbols, and run under lldb.
-debug: clean
-	${MAKE} CFLAGS='${DBGFLAGS} -std=c17 -Wall -Wextra -Wpedantic' ${PROG}
-	${DEBUGGER} ./${PROG}
+# Build a separate debug binary from source and run it under lldb.
+debug:
+	${CC} ${CFLAGS} ${DBGFLAGS} ${CPPFLAGS} -o ${PROG}_debug ${SRCS} ${LDLIBS}
+	${DEBUGGER} ./${PROG}_debug
 
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDLIBS}
@@ -101,6 +101,6 @@ test-locale: ${TEST_BINS}
 	@sh tests/locale_matrix.sh ${TEST_BINS}
 
 clean:
-	rm -f ${PROG} ${OBJS} ${TEST_BINS} ${TEST_OBJS}
+	rm -f ${PROG} ${PROG}_debug ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
 .PHONY: all rebuild debug install install-conf uninstall test test-locale clean
