@@ -36,6 +36,11 @@ TEST_OBJS = tests/config.o tests/fmt.o tests/ipc.o tests/test_support.o
 
 all: ${PROG}
 
+# Full rebuild from scratch.
+rebuild:
+	${MAKE} clean
+	${MAKE} ${PROG}
+
 # Rebuild without optimisation, with symbols, and run under lldb.
 debug: clean
 	${MAKE} CFLAGS='${DBGFLAGS} -std=c17 -Wall -Wextra -Wpedantic' ${PROG}
@@ -98,4 +103,4 @@ test-locale: ${TEST_BINS}
 clean:
 	rm -f ${PROG} ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
-.PHONY: all debug install install-conf uninstall test test-locale clean
+.PHONY: all rebuild debug install install-conf uninstall test test-locale clean
