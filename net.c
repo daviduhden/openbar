@@ -186,6 +186,8 @@ http_fetch(int family, char *out, size_t outlen)
 	total = 0;
 	while (total < sizeof(req) - 1) {
 		n = tls_write(ctx, req + total, sizeof(req) - 1 - total);
+		if (n == TLS_WANT_POLLIN || n == TLS_WANT_POLLOUT)
+			continue;	/* blocking fd: retry immediately */
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
@@ -206,6 +208,8 @@ http_fetch(int family, char *out, size_t outlen)
 			goto done;
 		}
 		n = tls_read(ctx, buf + total, sizeof(buf) - 1 - total);
+		if (n == TLS_WANT_POLLIN || n == TLS_WANT_POLLOUT)
+			continue;	/* blocking fd: retry immediately */
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;

@@ -1,5 +1,5 @@
 /*
- * IPC codec and descriptor helper tests.  Pure C17, host-runnable.
+ * IPC codec and descriptor helper tests.  Pure C23, host-runnable.
  */
 
 #include "test.h"

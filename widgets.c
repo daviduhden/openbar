@@ -61,7 +61,7 @@
 #define SENSOR_DEV_MAX		64
 
 /* Sensor value is expressed in microkelvin. */
-#define MICROKELVIN_FREEZING	273150000LL
+#define MICROKELVIN_FREEZING	273'150'000LL
 
 static void	collect_hostname(struct openbar *);
 static void	collect_date(struct openbar *);
@@ -189,7 +189,7 @@ collect_cpu(struct openbar *app)
 	if (dev >= 0 && sysctl(mib, 5, &s, &len, NULL, 0) != -1 &&
 	    (s.flags & SENSOR_FINVALID) == 0) {
 		app->cpu_temp = (int)((s.value - MICROKELVIN_FREEZING) /
-		    1000000);
+		    1'000'000);
 		app->cpu_have_temp = true;
 		return;
 	}

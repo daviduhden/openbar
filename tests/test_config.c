@@ -1,5 +1,5 @@
 /*
- * Configuration parser tests.  Run on any C17 host; exercises
+ * Configuration parser tests.  Run on any C23 host; exercises
  * defaults, directives, error reporting and the discovery fallbacks.
  */
 
@@ -244,16 +244,13 @@ test_line_too_long(void)
 	{
 		char	*path = write_conf("logo ");
 		/* build a file with a huge line in one go */
-		char	*tmp = malloc(strlen(path) + sizeof(buf) + 2);
 		FILE	*fp;
 
-		snprintf(tmp, strlen(path) + sizeof(buf) + 2, "%s", path);
 		fp = fopen(path, "a");
 		if (fp == NULL)
 			exit(1);
 		if (fputs(buf, fp) == EOF || fclose(fp) != 0)
 			exit(1);
-		free(tmp);
 
 		{
 			struct conf c;

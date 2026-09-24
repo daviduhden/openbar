@@ -30,7 +30,7 @@
 /*
  * cwm-style configuration parser.
  *
- * This translation unit is pure ISO C17: it performs no I/O beyond
+ * This translation unit is pure ISO C23: it performs no I/O beyond
  * reading the configuration file, so it can be unit-tested on any
  * host.  It owns the strings of struct conf; callers must call
  * conf_free() when done.

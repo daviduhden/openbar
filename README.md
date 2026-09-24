@@ -152,7 +152,7 @@ gap 24 0 0 0
 
 OpenBSD only.  Requires the `comp` set, Xenocara `xbase` headers/libraries
 (`libX11`, `libXft`, `libXrender`, `fontconfig`, `freetype`) and `libtls`
-from base.  The code is ISO C17 (`-std=c17`).
+from base.  The code is ISO C23 (`-std=c23`).
 
 ```sh
 git clone https://github.com/daviduhden/openbar.git
