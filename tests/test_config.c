@@ -3,23 +3,22 @@
  * defaults, directives, error reporting and the discovery fallbacks.
  */
 
-#include "test.h"
-
-#include "../openbar.h"
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "../openbar.h"
+#include "test.h"
+
 static char *
 write_conf(const char *content)
 {
-	char	 template[] = "/tmp/openbar-conf-XXXXXX";
-	char	*path;
-	FILE	*fp;
-	int	 fd;
+	char  template[] = "/tmp/openbar-conf-XXXXXX";
+	char *path;
+	FILE *fp;
+	int   fd;
 
 	fd = mkstemp(template);
 	if (fd == -1) {
@@ -55,7 +54,7 @@ quiet(void)
 static void
 test_defaults(void)
 {
-	struct conf	c;
+	struct conf c;
 
 	conf_defaults(&c);
 	CHECK(c.logo == NULL);
@@ -65,8 +64,7 @@ test_defaults(void)
 	CHECK_STR(c.colors[COLOR_BG], "#CCCCCC");
 	CHECK_STR(c.colors[COLOR_URGENT], "#FC8814");
 	CHECK(c.barheight == 24);
-	CHECK(c.gap[0] == 0 && c.gap[1] == 0 && c.gap[2] == 0 &&
-	    c.gap[3] == 0);
+	CHECK(c.gap[0] == 0 && c.gap[1] == 0 && c.gap[2] == 0 && c.gap[3] == 0);
 	for (int i = 0; i < WIDGET_NITEMS; i++)
 		CHECK(!c.enabled[i]);
 	conf_free(&c);
@@ -75,37 +73,35 @@ test_defaults(void)
 static void
 test_valid(void)
 {
-	const char	*text =
-	    "# full configuration\n"
-	    "\n"
-	    "  logo  \"Open Bar\"  \n"
-	    "fontname \"DejaVu Sans Mono:size=12\"\n"
-	    "barheight 30\n"
-	    "gap 1 2 3 4\n"
-	    "color barbg \"#ABCDEF\"\n"
-	    "color barfg white\n"
-	    "color urgent '#123'\n"
-	    "interface iwm0\n"
-	    "show hostname\n"
-	    "show date\n"
-	    "show cpu\n"
-	    "show mem\n"
-	    "show load\n"
-	    "show bat\n"
-	    "show vpn\n"
-	    "show net\n"
-	    "hide bat\n";
-	char		*path = write_conf(text);
-	struct conf	 c;
-	int		 rc;
+	const char *text = "# full configuration\n"
+			   "\n"
+			   "  logo  \"Open Bar\"  \n"
+			   "fontname \"DejaVu Sans Mono:size=12\"\n"
+			   "barheight 30\n"
+			   "gap 1 2 3 4\n"
+			   "color barbg \"#ABCDEF\"\n"
+			   "color barfg white\n"
+			   "color urgent '#123'\n"
+			   "interface iwm0\n"
+			   "show hostname\n"
+			   "show date\n"
+			   "show cpu\n"
+			   "show mem\n"
+			   "show load\n"
+			   "show bat\n"
+			   "show vpn\n"
+			   "show net\n"
+			   "hide bat\n";
+	char	   *path = write_conf(text);
+	struct conf c;
+	int	    rc;
 
 	rc = conf_load(path, &c);
 	CHECK(rc == 0);
 	CHECK_STR(c.logo, "Open Bar");
 	CHECK_STR(c.fontname, "DejaVu Sans Mono:size=12");
 	CHECK(c.barheight == 30);
-	CHECK(c.gap[0] == 1 && c.gap[1] == 2 && c.gap[2] == 3 &&
-	    c.gap[3] == 4);
+	CHECK(c.gap[0] == 1 && c.gap[1] == 2 && c.gap[2] == 3 && c.gap[3] == 4);
 	CHECK_STR(c.colors[COLOR_BG], "#ABCDEF");
 	CHECK_STR(c.colors[COLOR_FG], "white");
 	CHECK_STR(c.colors[COLOR_URGENT], "#123");
@@ -124,8 +120,8 @@ test_valid(void)
 static void
 test_missing_logo(void)
 {
-	char		*path = write_conf("barheight 20\n");
-	struct conf	 c;
+	char	   *path = write_conf("barheight 20\n");
+	struct conf c;
 
 	quiet();
 	CHECK(conf_load(path, &c) == -1);
@@ -136,12 +132,11 @@ test_missing_logo(void)
 static void
 test_duplicate_last_wins(void)
 {
-	char		*path = write_conf(
-	    "logo first\n"
-	    "barheight 20\n"
-	    "barheight 40\n"
-	    "logo second\n");
-	struct conf	 c;
+	char	   *path = write_conf("logo first\n"
+				      "barheight 20\n"
+				      "barheight 40\n"
+				      "logo second\n");
+	struct conf c;
 
 	CHECK(conf_load(path, &c) == 0);
 	CHECK_STR(c.logo, "second");
@@ -154,8 +149,8 @@ test_duplicate_last_wins(void)
 static void
 expect_fail(const char *text)
 {
-	char		*path = write_conf(text);
-	struct conf	 c;
+	char	   *path = write_conf(text);
+	struct conf c;
 
 	quiet();
 	CHECK(conf_load(path, &c) == -1);
@@ -200,16 +195,16 @@ test_invalid(void)
 	expect_fail("logo x\ninterface\n");
 	/* logo too long */
 	expect_fail("logo "
-	    "01234567890123456789012345678901234567890123456789"
-	    "01234567890123456789012345678901234567890123456789"
-	    "012345678901234567890123456789\n");
+		    "01234567890123456789012345678901234567890123456789"
+		    "01234567890123456789012345678901234567890123456789"
+		    "012345678901234567890123456789\n");
 }
 
 static void
 test_unknown_keyword_ignored(void)
 {
-	char		*path = write_conf("logo x\nfrobnicate 42\n");
-	struct conf	 c;
+	char	   *path = write_conf("logo x\nfrobnicate 42\n");
+	struct conf c;
 
 	quiet();
 	CHECK(conf_load(path, &c) == 0);
@@ -237,14 +232,14 @@ test_widget_lookup(void)
 static void
 test_line_too_long(void)
 {
-	char	buf[8192];
+	char buf[8192];
 
 	memset(buf, 'x', sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
 	{
-		char	*path = write_conf("logo ");
+		char *path = write_conf("logo ");
 		/* build a file with a huge line in one go */
-		FILE	*fp;
+		FILE *fp;
 
 		fp = fopen(path, "a");
 		if (fp == NULL)

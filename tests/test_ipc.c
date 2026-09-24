@@ -2,16 +2,16 @@
  * IPC codec and descriptor helper tests.  Pure C23, host-runnable.
  */
 
-#include "test.h"
-
-#include "../openbar.h"
+#include <sys/socket.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
+
+#include "../openbar.h"
+#include "test.h"
 
 static void
 test_valid_ip(void)
@@ -41,8 +41,8 @@ test_valid_ip(void)
 static void
 test_encode_decode_roundtrip(void)
 {
-	struct net_response	resp;
-	unsigned char		buf[sizeof(resp)];
+	struct net_response resp;
+	unsigned char	    buf[sizeof(resp)];
 
 	ipc_encode(&resp, NET_OK, "203.0.113.7", NET_OK, "2001:db8::1");
 	CHECK(resp.magic == IPC_MAGIC);
@@ -61,7 +61,7 @@ test_encode_decode_roundtrip(void)
 static void
 test_encode_failures(void)
 {
-	struct net_response	resp;
+	struct net_response resp;
 
 	ipc_encode(&resp, NET_ERR_DNS, "1.2.3.4", NET_ERR_CONNECT, "::1");
 	CHECK(resp.status_v4 == NET_ERR_DNS);
@@ -73,8 +73,8 @@ test_encode_failures(void)
 static void
 test_decode_validation(void)
 {
-	struct net_response	resp, bad;
-	unsigned char		buf[sizeof(resp)];
+	struct net_response resp, bad;
+	unsigned char	    buf[sizeof(resp)];
 
 	ipc_encode(&bad, NET_OK, "1.2.3.4", NET_OK, "::1");
 	memcpy(buf, &bad, sizeof(buf));
@@ -128,7 +128,7 @@ test_read_write_full(void)
 {
 	int	fds[2];
 	char	in[8], out[8] = "abcdefg";
-	ssize_t	n;
+	ssize_t n;
 
 	signal(SIGPIPE, SIG_IGN);
 	CHECK(pipe(fds) == 0);
@@ -140,7 +140,7 @@ test_read_write_full(void)
 	n = read_full(fds[0], in, sizeof(in));
 	CHECK(n == 7);
 	CHECK(memcmp(in, out, 7) == 0);
-	CHECK(read_full(fds[0], in, 1) == 0);	/* EOF */
+	CHECK(read_full(fds[0], in, 1) == 0); /* EOF */
 	close(fds[0]);
 
 	/* write to a closed reader must fail with EPIPE, not hang */
@@ -154,7 +154,7 @@ static void
 test_ipc_send_fetch(void)
 {
 	int	fds[2];
-	uint8_t	cmd = 0;
+	uint8_t cmd = 0;
 
 	CHECK(pipe(fds) == 0);
 	CHECK(ipc_send_fetch(fds[1]) == 0);

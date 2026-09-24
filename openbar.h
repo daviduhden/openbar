@@ -51,26 +51,22 @@
 #error "openbar requires ISO C23 (-std=c23)"
 #endif
 
+#include <sys/types.h> /* pid_t */
+
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>		/* pid_t */
-#include <time.h>		/* time_t, struct timespec */
+#include <time.h> /* time_t, struct timespec */
 
-#define BAR_TEXT_MAX	1024	/* whole bar line, incl. logo and widgets */
-#define WITEM_TEXT_MAX	160	/* one widget segment */
-#define LOGO_MAX	127	/* logo length limit */
-#define IFNAME_MAX	15	/* IFNAMSIZ - 1, validated at parse time */
-#define HOSTNAME_MAX	127	/* display bound for the host name */
+#define BAR_TEXT_MAX 1024  /* whole bar line, incl. logo and widgets */
+#define WITEM_TEXT_MAX 160 /* one widget segment */
+#define LOGO_MAX 127	   /* logo length limit */
+#define IFNAME_MAX 15	   /* IFNAMSIZ - 1, validated at parse time */
+#define HOSTNAME_MAX 127   /* display bound for the host name */
 
-#define ADDR4_STRLEN	16	/* INET_ADDRSTRLEN */
-#define ADDR6_STRLEN	46	/* INET6_ADDRSTRLEN */
+#define ADDR4_STRLEN 16 /* INET_ADDRSTRLEN */
+#define ADDR6_STRLEN 46 /* INET6_ADDRSTRLEN */
 
-enum color_slot {
-	COLOR_FG,
-	COLOR_BG,
-	COLOR_URGENT,
-	COLOR_NITEMS
-};
+enum color_slot { COLOR_FG, COLOR_BG, COLOR_URGENT, COLOR_NITEMS };
 
 enum widget {
 	WIDGET_HOSTNAME,
@@ -85,20 +81,20 @@ enum widget {
 };
 
 struct conf {
-	char	*logo;
-	char	*interface;
-	char	*fontname;
-	char	*colors[COLOR_NITEMS];
-	int	 barheight;	/* pixels, 12..60 */
-	int	 gap[4];	/* top, bottom, left, right */
-	bool	 enabled[WIDGET_NITEMS];
+	char *logo;
+	char *interface;
+	char *fontname;
+	char *colors[COLOR_NITEMS];
+	int   barheight; /* pixels, 12..60 */
+	int   gap[4];	 /* top, bottom, left, right */
+	bool  enabled[WIDGET_NITEMS];
 };
 
 /* One formatted widget segment, rendered with the urgent colour when
  * the widget carries a warning (e.g. critically low battery). */
 struct witem {
-	char	text[WITEM_TEXT_MAX];
-	bool	urgent;
+	char text[WITEM_TEXT_MAX];
+	bool urgent;
 };
 
 /*
@@ -110,8 +106,8 @@ struct witem {
  * image (fork(2), no exec), so padding is irrelevant, but the layout
  * is still checked at compile time.
  */
-#define IPC_CMD_FETCH	0x01
-#define IPC_MAGIC	0x4f	/* 'O' */
+#define IPC_CMD_FETCH 0x01
+#define IPC_MAGIC 0x4f /* 'O' */
 
 enum net_status : uint8_t {
 	NET_OK,
@@ -124,59 +120,59 @@ enum net_status : uint8_t {
 };
 
 struct net_response {
-	uint8_t	magic;
-	uint8_t	status_v4;
-	uint8_t	status_v6;
+	uint8_t magic;
+	uint8_t status_v4;
+	uint8_t status_v6;
 	char	addr_v4[ADDR4_STRLEN];
 	char	addr_v6[ADDR6_STRLEN];
 };
 
 enum ipc_state {
-	IPC_IDLE,	/* waiting for the next fetch deadline */
-	IPC_FETCHING,	/* request sent, awaiting the response */
-	IPC_BROKEN	/* worker is gone; no more public addresses */
+	IPC_IDLE,     /* waiting for the next fetch deadline */
+	IPC_FETCHING, /* request sent, awaiting the response */
+	IPC_BROKEN    /* worker is gone; no more public addresses */
 };
 
 struct openbar {
-	struct conf		conf;
+	struct conf conf;
 
 	/* network worker */
-	int			ipc_fd;
-	pid_t			ipc_pid;
-	enum ipc_state		ipc_state;
-	unsigned char		ipc_rbuf[sizeof(struct net_response)];
-	size_t			ipc_rlen;
-	struct timespec		ipc_deadline;
+	int		ipc_fd;
+	pid_t		ipc_pid;
+	enum ipc_state	ipc_state;
+	unsigned char	ipc_rbuf[sizeof(struct net_response)];
+	size_t		ipc_rlen;
+	struct timespec ipc_deadline;
 
 	/* refresh scheduling, CLOCK_MONOTONIC based */
-	struct timespec		due[WIDGET_NITEMS];
-	struct timespec		fetch_due;
+	struct timespec due[WIDGET_NITEMS];
+	struct timespec fetch_due;
 
 	/* collected metrics */
-	char			hostname[HOSTNAME_MAX + 1];
-	time_t			now;
-	unsigned int		cpu_mhz;
-	int			cpu_temp;	/* degrees Celsius */
-	int			cpu_sensor;	/* 0 unknown, >0 dev+1, -1 none */
-	bool			cpu_have_freq;
-	bool			cpu_have_temp;
-	bool			mem_valid;
-	unsigned long long	mem_free_mb;
-	bool			load_valid;
-	double			load1;
-	int			bat_pct;	/* -1 when unavailable */
-	bool			vpn_up;
-	char			pub_ip4[ADDR4_STRLEN];
-	char			pub_ip6[ADDR6_STRLEN];
-	char			int_ip4[ADDR4_STRLEN];
+	char		   hostname[HOSTNAME_MAX + 1];
+	time_t		   now;
+	unsigned int	   cpu_mhz;
+	int		   cpu_temp;   /* degrees Celsius */
+	int		   cpu_sensor; /* 0 unknown, >0 dev+1, -1 none */
+	bool		   cpu_have_freq;
+	bool		   cpu_have_temp;
+	bool		   mem_valid;
+	unsigned long long mem_free_mb;
+	bool		   load_valid;
+	double		   load1;
+	int		   bat_pct; /* -1 when unavailable */
+	bool		   vpn_up;
+	char		   pub_ip4[ADDR4_STRLEN];
+	char		   pub_ip6[ADDR6_STRLEN];
+	char		   int_ip4[ADDR4_STRLEN];
 
 	/* rendering */
-	struct witem		seg[WIDGET_NITEMS];
-	char			bar_text[BAR_TEXT_MAX];
-	bool			dirty;
+	struct witem seg[WIDGET_NITEMS];
+	char	     bar_text[BAR_TEXT_MAX];
+	bool	     dirty;
 
 	/* pre-opened devices */
-	int			apm_fd;
+	int apm_fd;
 };
 
 /* config.c */
@@ -189,28 +185,27 @@ extern const char *const default_colors[COLOR_NITEMS];
 extern const char	 default_font[];
 
 /* ipc.c */
-[[nodiscard]] ssize_t	 read_full(int, void *, size_t);
-[[nodiscard]] ssize_t	 write_full(int, const void *, size_t);
-[[nodiscard]] int	 valid_ip(const char *, int);
-[[nodiscard]] int	 ipc_send_fetch(int);
-void	 ipc_encode(struct net_response *, int, const char *, int,
-    const char *);
-[[nodiscard]] int	 ipc_decode(const unsigned char *, size_t,
-    struct net_response *);
+[[nodiscard]] ssize_t read_full(int, void *, size_t);
+[[nodiscard]] ssize_t write_full(int, const void *, size_t);
+[[nodiscard]] int     valid_ip(const char *, int);
+[[nodiscard]] int     ipc_send_fetch(int);
+void ipc_encode(struct net_response *, int, const char *, int, const char *);
+[[nodiscard]] int ipc_decode(
+    const unsigned char *, size_t, struct net_response *);
 
 /* fmt.c */
-[[nodiscard]] int	 locale_init(void);
-void	 fmt_widget(const struct openbar *, enum widget, struct witem *);
-void	 compose_bar(struct openbar *);
-void	 utf8_bounded_copy(char *, const char *, size_t);
+[[nodiscard]] int locale_init(void);
+void fmt_widget(const struct openbar *, enum widget, struct witem *);
+void compose_bar(struct openbar *);
+void utf8_bounded_copy(char *, const char *, size_t);
 
 /* widgets.c (OpenBSD) */
-void	 collect_widget(struct openbar *, enum widget);
-void	 collect_cpu_init(struct openbar *);
-[[nodiscard]] int	 apm_open(void);
+void		  collect_widget(struct openbar *, enum widget);
+void		  collect_cpu_init(struct openbar *);
+[[nodiscard]] int apm_open(void);
 
 /* net.c (OpenBSD network worker) */
-void	 net_worker(int);
-[[nodiscard]] int	 net_worker_start(struct openbar *);
+void		  net_worker(int);
+[[nodiscard]] int net_worker_start(struct openbar *);
 
 #endif /* OPENBAR_H */

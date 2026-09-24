@@ -7,14 +7,13 @@
  * hostile locale variables and verify that the invariants hold.
  */
 
-#include "test.h"
-
-#include "../openbar.h"
-
 #include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include "../openbar.h"
+#include "test.h"
 
 static void
 fresh_app(struct openbar *app)
@@ -45,8 +44,8 @@ test_locale_env_ignored(void)
 static void
 test_decimal_separator(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	setenv("LC_NUMERIC", "de_DE.UTF-8", 1);
 
@@ -59,11 +58,11 @@ test_decimal_separator(void)
 }
 
 static void
-check_date(struct openbar *app, int year, int mon, int mday, int hour,
-    int min, const char *expected)
+check_date(struct openbar *app, int year, int mon, int mday, int hour, int min,
+    const char *expected)
 {
-	struct tm	tm;
-	struct witem	it;
+	struct tm    tm;
+	struct witem it;
 
 	memset(&tm, 0, sizeof(tm));
 	tm.tm_year = year - 1900;
@@ -79,7 +78,7 @@ check_date(struct openbar *app, int year, int mon, int mday, int hour,
 static void
 test_date_names_english(void)
 {
-	struct openbar	app;
+	struct openbar app;
 
 	/* translated month/day names would differ under these locales */
 	setenv("LC_ALL", "de_DE.UTF-8", 1);

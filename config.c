@@ -36,8 +36,6 @@
  * conf_free() when done.
  */
 
-#include "openbar.h"
-
 #include <err.h>
 #include <errno.h>
 #include <limits.h>
@@ -46,53 +44,54 @@
 #include <string.h>
 #include <unistd.h>
 
-#define CONF_LINE_MAX		4096	/* per-line bound */
-#define HOME_MAX		1024	/* $HOME length bound */
-#define BARHEIGHT_MIN		12
-#define BARHEIGHT_MAX		60
+#include "openbar.h"
+
+#define CONF_LINE_MAX 4096 /* per-line bound */
+#define HOME_MAX 1024	   /* $HOME length bound */
+#define BARHEIGHT_MIN 12
+#define BARHEIGHT_MAX 60
 
 const char *const default_colors[COLOR_NITEMS] = {
-	"#000000",		/* COLOR_FG */
-	"#CCCCCC",		/* COLOR_BG */
-	"#FC8814",		/* COLOR_URGENT */
+    "#000000", /* COLOR_FG */
+    "#CCCCCC", /* COLOR_BG */
+    "#FC8814", /* COLOR_URGENT */
 };
 
 const char default_font[] = "sans-serif:pixelsize=14:bold";
 
 static const char *const color_names[COLOR_NITEMS] = {
-	"barfg",		/* COLOR_FG */
-	"barbg",		/* COLOR_BG */
-	"urgent",		/* COLOR_URGENT */
+    "barfg",  /* COLOR_FG */
+    "barbg",  /* COLOR_BG */
+    "urgent", /* COLOR_URGENT */
 };
 
 static const char *const widget_names[WIDGET_NITEMS] = {
-	[WIDGET_HOSTNAME]	= "hostname",
-	[WIDGET_DATE]		= "date",
-	[WIDGET_CPU]		= "cpu",
-	[WIDGET_MEM]		= "mem",
-	[WIDGET_LOAD]		= "load",
-	[WIDGET_BAT]		= "bat",
-	[WIDGET_VPN]		= "vpn",
-	[WIDGET_NET]		= "net",
+    [WIDGET_HOSTNAME] = "hostname",
+    [WIDGET_DATE] = "date",
+    [WIDGET_CPU] = "cpu",
+    [WIDGET_MEM] = "mem",
+    [WIDGET_LOAD] = "load",
+    [WIDGET_BAT] = "bat",
+    [WIDGET_VPN] = "vpn",
+    [WIDGET_NET] = "net",
 };
 
-static char	*xstrdup(const char *);
-static void	 setstr(char **, const char *);
-static int	 conf_parse_line(const char *, size_t, char *, struct conf *);
-static int	 parse_int(const char *, size_t, const char *, long long,
-    long long, int *);
-static int	 parse_gaps(const char *, size_t, char *, struct conf *);
-static int	 parse_color(const char *, size_t, char *, struct conf *);
-static int	 parse_logo(const char *, size_t, const char *, struct conf *);
-static int	 parse_interface(const char *, size_t, const char *,
-    struct conf *);
-static char	*strip_quotes(char *, const char **);
-static char	*trim(char *);
+static char *xstrdup(const char *);
+static void  setstr(char **, const char *);
+static int   conf_parse_line(const char *, size_t, char *, struct conf *);
+static int   parse_int(
+    const char *, size_t, const char *, long long, long long, int *);
+static int   parse_gaps(const char *, size_t, char *, struct conf *);
+static int   parse_color(const char *, size_t, char *, struct conf *);
+static int   parse_logo(const char *, size_t, const char *, struct conf *);
+static int   parse_interface(const char *, size_t, const char *, struct conf *);
+static char *strip_quotes(char *, const char **);
+static char *trim(char *);
 
 static char *
 xstrdup(const char *str)
 {
-	char	*p;
+	char *p;
 
 	if ((p = strdup(str)) == NULL)
 		err(1, "strdup");
@@ -107,15 +106,13 @@ xstrdup(const char *str)
 static int
 ident_start(unsigned char c)
 {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-	    c == '_';
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 static int
 ident_char(unsigned char c)
 {
-	return ident_start(c) || (c >= '0' && c <= '9') || c == '-' ||
-	    c == '.';
+	return ident_start(c) || (c >= '0' && c <= '9') || c == '-' || c == '.';
 }
 
 static void
@@ -128,7 +125,7 @@ setstr(char **dest, const char *value)
 static char *
 trim(char *s)
 {
-	char	*end;
+	char *end;
 
 	while (*s == ' ' || *s == '\t')
 		s++;
@@ -149,7 +146,7 @@ trim(char *s)
 static char *
 strip_quotes(char *arg, const char **errmsg)
 {
-	char	quote, *end;
+	char quote, *end;
 
 	arg = trim(arg);
 	if (*arg != '"' && *arg != '\'')
@@ -173,13 +170,13 @@ static int
 parse_int(const char *path, size_t lineno, const char *value, long long min,
     long long max, int *out)
 {
-	const char	*errstr;
-	long long	 v;
+	const char *errstr;
+	long long   v;
 
 	v = strtonum(value, min, max, &errstr);
 	if (errstr != NULL) {
-		warnx("%s:%zu: invalid value '%s' (expected %lld-%lld)",
-		    path, lineno, value, min, max);
+		warnx("%s:%zu: invalid value '%s' (expected %lld-%lld)", path,
+		    lineno, value, min, max);
 		return -1;
 	}
 	*out = (int)v;
@@ -189,17 +186,17 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
 static int
 parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 {
-	char		*saveptr = NULL, *token;
-	const char	*errstr;
-	int		 gaps[4], n = 0;
+	char	   *saveptr = NULL, *token;
+	const char *errstr;
+	int	    gaps[4], n = 0;
 
 	for (token = strtok_r(arg, " \t", &saveptr); token != NULL;
 	    token = strtok_r(NULL, " \t", &saveptr)) {
 		long long v;
 
 		if (n == 4) {
-			warnx("%s:%zu: gap takes exactly four values",
-			    path, lineno);
+			warnx("%s:%zu: gap takes exactly four values", path,
+			    lineno);
 			return -1;
 		}
 		v = strtonum(token, 0, INT_MAX, &errstr);
@@ -211,8 +208,7 @@ parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 		gaps[n++] = (int)v;
 	}
 	if (n != 4) {
-		warnx("%s:%zu: gap takes exactly four values", path,
-		    lineno);
+		warnx("%s:%zu: gap takes exactly four values", path, lineno);
 		return -1;
 	}
 	memcpy(c->gap, gaps, sizeof(c->gap));
@@ -222,14 +218,14 @@ parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 static int
 parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 {
-	char		*space, *value, *unquoted;
-	const char	*errmsg;
-	unsigned int	 i;
+	char	    *space, *value, *unquoted;
+	const char  *errmsg;
+	unsigned int i;
 
 	space = strpbrk(arg, " \t");
 	if (space == NULL) {
-		warnx("%s:%zu: color requires a slot and a value", path,
-		    lineno);
+		warnx(
+		    "%s:%zu: color requires a slot and a value", path, lineno);
 		return -1;
 	}
 	*space = '\0';
@@ -240,8 +236,8 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 		return -1;
 	}
 	if (*unquoted == '\0') {
-		warnx("%s:%zu: color requires a slot and a value", path,
-		    lineno);
+		warnx(
+		    "%s:%zu: color requires a slot and a value", path, lineno);
 		return -1;
 	}
 	if (strlen(unquoted) > 63) {
@@ -259,10 +255,9 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 }
 
 static int
-parse_logo(const char *path, size_t lineno, const char *value,
-    struct conf *c)
+parse_logo(const char *path, size_t lineno, const char *value, struct conf *c)
 {
-	size_t	len = strlen(value);
+	size_t len = strlen(value);
 
 	if (len == 0) {
 		warnx("%s:%zu: logo must not be empty", path, lineno);
@@ -278,19 +273,19 @@ parse_logo(const char *path, size_t lineno, const char *value,
 }
 
 static int
-parse_interface(const char *path, size_t lineno, const char *value,
-    struct conf *c)
+parse_interface(
+    const char *path, size_t lineno, const char *value, struct conf *c)
 {
-	size_t	len = strlen(value);
+	size_t len = strlen(value);
 
 	if (len == 0 || len > IFNAME_MAX) {
-		warnx("%s:%zu: invalid interface name '%s'", path, lineno,
-		    value);
+		warnx(
+		    "%s:%zu: invalid interface name '%s'", path, lineno, value);
 		return -1;
 	}
 	if (!ident_start((unsigned char)value[0])) {
-		warnx("%s:%zu: invalid interface name '%s'", path, lineno,
-		    value);
+		warnx(
+		    "%s:%zu: invalid interface name '%s'", path, lineno, value);
 		return -1;
 	}
 	for (size_t i = 1; i < len; i++) {
@@ -307,8 +302,8 @@ parse_interface(const char *path, size_t lineno, const char *value,
 static int
 conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 {
-	const char	*errmsg;
-	char		*kw, *arg, *value;
+	const char *errmsg;
+	char	   *kw, *arg, *value;
 
 	line[strcspn(line, "\n")] = '\0';
 	kw = trim(line);
@@ -322,16 +317,15 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 	}
 
 	if (strcmp(kw, "show") == 0 || strcmp(kw, "hide") == 0) {
-		int	w;
+		int w;
 
 		if (arg == NULL || *arg == '\0') {
-			warnx("%s:%zu: %s requires a widget name", path,
-			    lineno, kw);
+			warnx("%s:%zu: %s requires a widget name", path, lineno,
+			    kw);
 			return -1;
 		}
 		if ((w = widget_lookup(arg)) == -1) {
-			warnx("%s:%zu: unknown widget '%s'", path, lineno,
-			    arg);
+			warnx("%s:%zu: unknown widget '%s'", path, lineno, arg);
 			return -1;
 		}
 		c->enabled[w] = (strcmp(kw, "show") == 0);
@@ -339,8 +333,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 	}
 
 	if (arg == NULL || *arg == '\0') {
-		warnx("%s:%zu: missing argument for '%s'", path, lineno,
-		    kw);
+		warnx("%s:%zu: missing argument for '%s'", path, lineno, kw);
 		return -1;
 	}
 
@@ -368,8 +361,8 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 			return -1;
 		}
 		if (*value == '\0') {
-			warnx("%s:%zu: fontname must not be empty", path,
-			    lineno);
+			warnx(
+			    "%s:%zu: fontname must not be empty", path, lineno);
 			return -1;
 		}
 		setstr(&c->fontname, value);
@@ -383,7 +376,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 int
 widget_lookup(const char *name)
 {
-	unsigned int	i;
+	unsigned int i;
 
 	for (i = 0; i < WIDGET_NITEMS; i++) {
 		if (strcmp(name, widget_names[i]) == 0)
@@ -395,7 +388,7 @@ widget_lookup(const char *name)
 void
 conf_defaults(struct conf *c)
 {
-	unsigned int	i;
+	unsigned int i;
 
 	memset(c, 0, sizeof(*c));
 	c->barheight = 24;
@@ -407,7 +400,7 @@ conf_defaults(struct conf *c)
 void
 conf_free(struct conf *c)
 {
-	unsigned int	i;
+	unsigned int i;
 
 	free(c->logo);
 	c->logo = NULL;
@@ -431,10 +424,10 @@ conf_free(struct conf *c)
 int
 conf_load(const char *path, struct conf *c)
 {
-	FILE	*fp = NULL;
-	char	*line = NULL;
-	size_t	 cap = 0, lineno = 0;
-	int	 rc = -1;
+	FILE  *fp = NULL;
+	char  *line = NULL;
+	size_t cap = 0, lineno = 0;
+	int    rc = -1;
 
 	conf_defaults(c);
 
@@ -483,16 +476,15 @@ out:
 char *
 conf_resolve_path(const char *override_path)
 {
-	const char	*home;
+	const char *home;
 
 	if (override_path != NULL)
 		return xstrdup(override_path);
 
 	home = getenv("HOME");
-	if (home != NULL && home[0] != '\0' &&
-	    strlen(home) < HOME_MAX) {
-		size_t	 len = strlen(home) + sizeof("/.openbarrc");
-		char	*p = malloc(len);
+	if (home != NULL && home[0] != '\0' && strlen(home) < HOME_MAX) {
+		size_t len = strlen(home) + sizeof("/.openbarrc");
+		char  *p = malloc(len);
 
 		if (p == NULL)
 			err(1, "malloc");
