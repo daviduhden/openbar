@@ -2,13 +2,12 @@
  * Widget formatting and bar composition tests.  Pure C23, host-runnable.
  */
 
-#include "test.h"
-
-#include "../openbar.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include "../openbar.h"
+#include "test.h"
 
 static void
 fresh_app(struct openbar *app)
@@ -24,8 +23,8 @@ fresh_app(struct openbar *app)
 static void
 test_fmt_cpu(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	fresh_app(&app);
 	app.cpu_mhz = 2400;
@@ -54,8 +53,8 @@ test_fmt_cpu(void)
 static void
 test_fmt_mem_load(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	fresh_app(&app);
 	app.mem_valid = true;
@@ -81,8 +80,8 @@ test_fmt_mem_load(void)
 static void
 test_fmt_bat(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	fresh_app(&app);
 	app.bat_pct = -1;
@@ -110,8 +109,8 @@ test_fmt_bat(void)
 static void
 test_fmt_vpn_net(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	fresh_app(&app);
 	app.vpn_up = true;
@@ -138,13 +137,13 @@ test_fmt_vpn_net(void)
 static void
 test_fmt_date(void)
 {
-	struct openbar	app;
-	struct witem	it;
-	struct tm	tm;
+	struct openbar app;
+	struct witem   it;
+	struct tm      tm;
 
 	fresh_app(&app);
 	memset(&tm, 0, sizeof(tm));
-	tm.tm_year = 120;	/* 2020 */
+	tm.tm_year = 120; /* 2020 */
 	tm.tm_mon = 0;
 	tm.tm_mday = 6;
 	tm.tm_hour = 12;
@@ -163,8 +162,8 @@ test_fmt_date(void)
 static void
 test_fmt_hostname(void)
 {
-	struct openbar	app;
-	struct witem	it;
+	struct openbar app;
+	struct witem   it;
 
 	fresh_app(&app);
 	strcpy(app.hostname, "puffy");
@@ -176,7 +175,7 @@ test_fmt_hostname(void)
 static void
 test_compose(void)
 {
-	struct openbar	app;
+	struct openbar app;
 
 	fresh_app(&app);
 	conf_free(&app.conf);
@@ -226,7 +225,7 @@ test_compose(void)
 static void
 test_utf8_bounded_copy(void)
 {
-	char	buf[32];
+	char buf[32];
 
 	/* untruncated copy is byte-identical */
 	utf8_bounded_copy(buf, "héllo", sizeof(buf));
@@ -278,7 +277,7 @@ test_utf8_bounded_copy(void)
 static void
 test_compose_utf8_logo(void)
 {
-	struct openbar	app;
+	struct openbar app;
 
 	fresh_app(&app);
 	conf_free(&app.conf);

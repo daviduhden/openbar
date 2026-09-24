@@ -13,9 +13,9 @@ long long
 strtonum(const char *numstr, long long minval, long long maxval,
     const char **errstrp)
 {
-	long long	 ll = 0;
-	const char	*errmsg = "invalid";
-	char		*ep;
+	long long   ll = 0;
+	const char *errmsg = "invalid";
+	char	   *ep;
 
 	if (minval > maxval) {
 		errmsg = "invalid range";

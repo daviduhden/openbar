@@ -51,15 +51,12 @@
  * "rpath" promise are kept; both are bounded by the unveil policy.
  */
 
-#include "openbar.h"
-
 #include <sys/socket.h>
 #include <sys/wait.h>
 
 #include <X11/Xatom.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
-
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -71,63 +68,63 @@
 #include <string.h>
 #include <unistd.h>
 
-#define FETCH_INTERVAL	300	/* seconds between public IP lookups */
-#define FETCH_TIMEOUT	30	/* seconds to wait for a worker reply */
+#include "openbar.h"
+
+#define FETCH_INTERVAL 300 /* seconds between public IP lookups */
+#define FETCH_TIMEOUT 30   /* seconds to wait for a worker reply */
 
 struct xstate {
-	Display		*dpy;
-	Window		 win;
-	XftDraw		*draw;
-	XftFont		*font;
-	XftColor	 colors[COLOR_NITEMS];
-	unsigned int	 ncolors;
-	Visual		*visual;
-	Colormap	 cmap;
-	int		 screen;
-	int		 w, h;
+	Display	    *dpy;
+	Window	     win;
+	XftDraw	    *draw;
+	XftFont	    *font;
+	XftColor     colors[COLOR_NITEMS];
+	unsigned int ncolors;
+	Visual	    *visual;
+	Colormap     cmap;
+	int	     screen;
+	int	     w, h;
 };
 
-static volatile sig_atomic_t	quit_flag;
-static volatile sig_atomic_t	chld_flag;
+static volatile sig_atomic_t quit_flag;
+static volatile sig_atomic_t chld_flag;
 
-static void	 usage(FILE *);
-static void	 setup_signals(void);
-static void	 quit_handler(int);
-static void	 chld_handler(int);
-static int	 xerror_handler(Display *, XErrorEvent *);
-[[noreturn]] static int	 xio_handler(Display *);
-static char	*resolve_xauthority(void);
-static int	 unveil_parent(const struct conf *, const char *);
-static void	 build_pledge(char *, size_t, const struct conf *);
-static int	 xstate_open(struct xstate *, const struct conf *);
-static void	 xstate_close(struct xstate *);
-static int	 window_create(struct xstate *, const struct conf *);
-static void	 redraw(struct openbar *, struct xstate *);
-static void	 draw_line(struct openbar *, struct xstate *);
-static void	 handle_x_events(struct openbar *, struct xstate *);
-static void	 collect_due(struct openbar *);
-static void	 schedule(struct openbar *, enum widget,
-    const struct timespec *);
-static int	 next_timeout_ms(struct openbar *);
-static int	 timespec_cmp(const struct timespec *,
-    const struct timespec *);
-static void	 reap_children(struct openbar *);
-static void	 ipc_tick(struct openbar *);
-static void	 ipc_read(struct openbar *);
-static void	 apply_response(struct openbar *);
-static void	 worker_lost(struct openbar *);
+static void		usage(FILE *);
+static void		setup_signals(void);
+static void		quit_handler(int);
+static void		chld_handler(int);
+static int		xerror_handler(Display *, XErrorEvent *);
+[[noreturn]] static int xio_handler(Display *);
+static char	       *resolve_xauthority(void);
+static int		unveil_parent(const struct conf *, const char *);
+static void		build_pledge(char *, size_t, const struct conf *);
+static int		xstate_open(struct xstate *, const struct conf *);
+static void		xstate_close(struct xstate *);
+static int		window_create(struct xstate *, const struct conf *);
+static void		redraw(struct openbar *, struct xstate *);
+static void		draw_line(struct openbar *, struct xstate *);
+static void		handle_x_events(struct openbar *, struct xstate *);
+static void		collect_due(struct openbar *);
+static void schedule(struct openbar *, enum widget, const struct timespec *);
+static int  next_timeout_ms(struct openbar *);
+static int  timespec_cmp(const struct timespec *, const struct timespec *);
+static void reap_children(struct openbar *);
+static void ipc_tick(struct openbar *);
+static void ipc_read(struct openbar *);
+static void apply_response(struct openbar *);
+static void worker_lost(struct openbar *);
 
 /* refresh periods in seconds; the date widget re-aligns to minute
  * boundaries, so its nominal interval is one second */
 static const int widget_intervals[WIDGET_NITEMS] = {
-	[WIDGET_HOSTNAME]	= 60,
-	[WIDGET_DATE]		= 1,
-	[WIDGET_CPU]		= 5,
-	[WIDGET_MEM]		= 2,
-	[WIDGET_LOAD]		= 2,
-	[WIDGET_BAT]		= 30,
-	[WIDGET_VPN]		= 10,
-	[WIDGET_NET]		= 10,
+    [WIDGET_HOSTNAME] = 60,
+    [WIDGET_DATE] = 1,
+    [WIDGET_CPU] = 5,
+    [WIDGET_MEM] = 2,
+    [WIDGET_LOAD] = 2,
+    [WIDGET_BAT] = 30,
+    [WIDGET_VPN] = 10,
+    [WIDGET_NET] = 10,
 };
 
 static void
@@ -155,7 +152,7 @@ chld_handler(int)
 static void
 setup_signals(void)
 {
-	struct sigaction	sa;
+	struct sigaction sa;
 
 	memset(&sa, 0, sizeof(sa));
 	sigemptyset(&sa.sa_mask);
@@ -202,8 +199,8 @@ xio_handler(Display *)
 static char *
 resolve_xauthority(void)
 {
-	const char	*auth, *home;
-	char		 resolved[PATH_MAX];
+	const char *auth, *home;
+	char	    resolved[PATH_MAX];
 
 	auth = getenv("XAUTHORITY");
 	if (auth != NULL && auth[0] != '\0') {
@@ -213,8 +210,8 @@ resolve_xauthority(void)
 	}
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
-		size_t	 len = strlen(home) + sizeof("/.Xauthority");
-		char	*candidate = malloc(len);
+		size_t len = strlen(home) + sizeof("/.Xauthority");
+		char  *candidate = malloc(len);
 
 		if (candidate == NULL)
 			err(1, "malloc");
@@ -255,18 +252,18 @@ static int
 unveil_parent(const struct conf *c, const char *xauth_path)
 {
 	static const char *const font_dirs[] = {
-		"/etc/fonts",
-		"/var/cache/fontconfig",
-		"/usr/X11R6/lib/X11/fonts",
-		"/usr/local/share/fonts",
+	    "/etc/fonts",
+	    "/var/cache/fontconfig",
+	    "/usr/X11R6/lib/X11/fonts",
+	    "/usr/local/share/fonts",
 	};
 	static const char *const user_dirs[] = {
-		"/.fonts",
-		"/.local/share/fonts",
-		"/.cache/fontconfig",
+	    "/.fonts",
+	    "/.local/share/fonts",
+	    "/.cache/fontconfig",
 	};
-	const char		*home;
-	unsigned int		 i;
+	const char  *home;
+	unsigned int i;
 
 	if (unveil("/tmp/.X11-unix", "rw") == -1) {
 		warn("unveil /tmp/.X11-unix");
@@ -282,10 +279,9 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 	}
 	home = getenv("HOME");
 	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
-		for (i = 0; i < sizeof(user_dirs) / sizeof(user_dirs[0]);
-		    i++) {
-			size_t	 len = strlen(home) + strlen(user_dirs[i]) + 1;
-			char	*path = malloc(len);
+		for (i = 0; i < sizeof(user_dirs) / sizeof(user_dirs[0]); i++) {
+			size_t len = strlen(home) + strlen(user_dirs[i]) + 1;
+			char  *path = malloc(len);
 
 			if (path == NULL)
 				err(1, "malloc");
@@ -329,14 +325,14 @@ build_pledge(char *buf, size_t bufsz, const struct conf *c)
 static int
 window_create(struct xstate *x, const struct conf *c)
 {
-	Atom		wm_state, wm_state_above, wm_bypass, wm_type;
-	Atom		wm_type_dock, wm_skip_taskbar, wm_skip_pager, wm_sticky;
-	Atom		wm_state_atoms[4];
-	unsigned long	bypass = 1;
-	int		sw = DisplayWidth(x->dpy, x->screen);
-	int		sh = DisplayHeight(x->dpy, x->screen);
-	long		w = (long)sw - c->gap[2] - c->gap[3];
-	int		h = c->barheight;
+	Atom	      wm_state, wm_state_above, wm_bypass, wm_type;
+	Atom	      wm_type_dock, wm_skip_taskbar, wm_skip_pager, wm_sticky;
+	Atom	      wm_state_atoms[4];
+	unsigned long bypass = 1;
+	int	      sw = DisplayWidth(x->dpy, x->screen);
+	int	      sh = DisplayHeight(x->dpy, x->screen);
+	long	      w = (long)sw - c->gap[2] - c->gap[3];
+	int	      h = c->barheight;
 
 	if (w < 1) {
 		warnx("horizontal gaps exceed screen width");
@@ -345,9 +341,8 @@ window_create(struct xstate *x, const struct conf *c)
 	if (h > sh)
 		h = sh;
 
-	x->win = XCreateSimpleWindow(x->dpy,
-	    RootWindow(x->dpy, x->screen), c->gap[2], c->gap[0],
-	    (unsigned int)w, (unsigned int)h, 0,
+	x->win = XCreateSimpleWindow(x->dpy, RootWindow(x->dpy, x->screen),
+	    c->gap[2], c->gap[0], (unsigned int)w, (unsigned int)h, 0,
 	    BlackPixel(x->dpy, x->screen), WhitePixel(x->dpy, x->screen));
 	XSelectInput(x->dpy, x->win, ExposureMask);
 
@@ -365,10 +360,10 @@ window_create(struct xstate *x, const struct conf *c)
 	wm_state_atoms[1] = wm_skip_taskbar;
 	wm_state_atoms[2] = wm_skip_pager;
 	wm_state_atoms[3] = wm_sticky;
-	XChangeProperty(x->dpy, x->win, wm_state, XA_ATOM, 32,
-	    PropModeReplace, (unsigned char *)wm_state_atoms, 4);
-	XChangeProperty(x->dpy, x->win, wm_type, XA_ATOM, 32,
-	    PropModeReplace, (unsigned char *)&wm_type_dock, 1);
+	XChangeProperty(x->dpy, x->win, wm_state, XA_ATOM, 32, PropModeReplace,
+	    (unsigned char *)wm_state_atoms, 4);
+	XChangeProperty(x->dpy, x->win, wm_type, XA_ATOM, 32, PropModeReplace,
+	    (unsigned char *)&wm_type_dock, 1);
 	XChangeProperty(x->dpy, x->win, wm_bypass, XA_CARDINAL, 32,
 	    PropModeReplace, (unsigned char *)&bypass, 1);
 
@@ -396,7 +391,7 @@ window_create(struct xstate *x, const struct conf *c)
 static int
 xstate_open(struct xstate *x, const struct conf *c)
 {
-	unsigned int	i;
+	unsigned int i;
 
 	memset(x, 0, sizeof(*x));
 	x->dpy = XOpenDisplay(NULL);
@@ -411,15 +406,15 @@ xstate_open(struct xstate *x, const struct conf *c)
 	x->cmap = DefaultColormap(x->dpy, x->screen);
 
 	for (i = 0; i < COLOR_NITEMS; i++) {
-		if (XftColorAllocName(x->dpy, x->visual, x->cmap,
-		    c->colors[i], &x->colors[i])) {
+		if (XftColorAllocName(x->dpy, x->visual, x->cmap, c->colors[i],
+			&x->colors[i])) {
 			x->ncolors++;
 			continue;
 		}
 		warnx("cannot allocate color '%s'; falling back to '%s'",
 		    c->colors[i], default_colors[i]);
 		if (!XftColorAllocName(x->dpy, x->visual, x->cmap,
-		    default_colors[i], &x->colors[i])) {
+			default_colors[i], &x->colors[i])) {
 			warnx("cannot allocate default color");
 			goto fail;
 		}
@@ -448,7 +443,7 @@ fail:
 static void
 xstate_close(struct xstate *x)
 {
-	unsigned int	i;
+	unsigned int i;
 
 	if (x->dpy == NULL)
 		return;
@@ -481,14 +476,14 @@ static void
 draw_line(struct openbar *app, struct xstate *x)
 {
 	struct chunk {
-		const char	*text;
-		bool		 urgent;
+		const char *text;
+		bool	    urgent;
 	};
-	struct chunk	chunks[2 * WIDGET_NITEMS + 2];
-	char		texts[2 * WIDGET_NITEMS + 2][WITEM_TEXT_MAX + 3];
-	XGlyphInfo	ext[2 * WIDGET_NITEMS + 2];
-	unsigned int	i;
-	int		nchunks = 0, total = 0, cx, cy;
+	struct chunk chunks[2 * WIDGET_NITEMS + 2];
+	char	     texts[2 * WIDGET_NITEMS + 2][WITEM_TEXT_MAX + 3];
+	XGlyphInfo   ext[2 * WIDGET_NITEMS + 2];
+	unsigned int i;
+	int	     nchunks = 0, total = 0, cx, cy;
 
 	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {
 		chunks[nchunks].text = app->conf.logo;
@@ -524,8 +519,9 @@ draw_line(struct openbar *app, struct xstate *x)
 		cx = 0;
 	cy = (x->h + x->font->ascent - x->font->descent) / 2;
 	for (i = 0; i < (unsigned int)nchunks; i++) {
-		const XftColor	*color = chunks[i].urgent ?
-		    &x->colors[COLOR_URGENT] : &x->colors[COLOR_FG];
+		const XftColor *color = chunks[i].urgent ?
+		    &x->colors[COLOR_URGENT] :
+		    &x->colors[COLOR_FG];
 
 		XftDrawStringUtf8(x->draw, color, x->font, cx, cy,
 		    (const FcChar8 *)chunks[i].text,
@@ -538,8 +534,8 @@ draw_line(struct openbar *app, struct xstate *x)
 static void
 redraw(struct openbar *app, struct xstate *x)
 {
-	XftDrawRect(x->draw, &x->colors[COLOR_BG], 0, 0,
-	    (unsigned int)x->w, (unsigned int)x->h);
+	XftDrawRect(x->draw, &x->colors[COLOR_BG], 0, 0, (unsigned int)x->w,
+	    (unsigned int)x->h);
 	draw_line(app, x);
 	XFlush(x->dpy);
 	app->dirty = false;
@@ -548,7 +544,7 @@ redraw(struct openbar *app, struct xstate *x)
 static void
 handle_x_events(struct openbar *app, struct xstate *x)
 {
-	XEvent	ev;
+	XEvent ev;
 
 	while (XPending(x->dpy) > 0) {
 		XNextEvent(x->dpy, &ev);
@@ -584,7 +580,7 @@ schedule(struct openbar *app, enum widget w, const struct timespec *now)
 static void
 collect_due(struct openbar *app)
 {
-	struct timespec	now;
+	struct timespec now;
 	unsigned int	i;
 	int		changed = 0;
 
@@ -609,7 +605,7 @@ collect_due(struct openbar *app)
 static int
 next_timeout_ms(struct openbar *app)
 {
-	struct timespec	now;
+	struct timespec now;
 	long long	ms = 1000, delta;
 	unsigned int	i;
 
@@ -623,8 +619,8 @@ next_timeout_ms(struct openbar *app)
 			ms = delta;
 	}
 	if (app->ipc_state == IPC_FETCHING) {
-		delta = (long long)(app->ipc_deadline.tv_sec -
-		    now.tv_sec) * 1000 +
+		delta =
+		    (long long)(app->ipc_deadline.tv_sec - now.tv_sec) * 1000 +
 		    (app->ipc_deadline.tv_nsec - now.tv_nsec) / 1000000;
 		if (delta < ms)
 			ms = delta;
@@ -637,8 +633,8 @@ next_timeout_ms(struct openbar *app)
 static void
 reap_children(struct openbar *app)
 {
-	pid_t	r;
-	int	status;
+	pid_t r;
+	int   status;
 
 	if (!chld_flag)
 		return;
@@ -676,7 +672,7 @@ worker_lost(struct openbar *app)
 static void
 ipc_tick(struct openbar *app)
 {
-	struct timespec	now;
+	struct timespec now;
 
 	if (app->ipc_fd == -1 || app->ipc_state == IPC_BROKEN)
 		return;
@@ -693,7 +689,7 @@ ipc_tick(struct openbar *app)
 		app->ipc_deadline = now;
 		app->ipc_deadline.tv_sec += FETCH_TIMEOUT;
 	} else if (timespec_cmp(&app->ipc_deadline, &now) <= 0) {
-		worker_lost(app);	/* stalled worker */
+		worker_lost(app); /* stalled worker */
 	}
 }
 
@@ -705,7 +701,7 @@ ipc_tick(struct openbar *app)
 static void
 ipc_read(struct openbar *app)
 {
-	struct timespec	now;
+	struct timespec now;
 	ssize_t		n;
 
 	n = recv(app->ipc_fd, app->ipc_rbuf + app->ipc_rlen,
@@ -722,28 +718,27 @@ ipc_read(struct openbar *app)
 		app->fetch_due.tv_sec += FETCH_INTERVAL;
 		return;
 	}
-	if (n == 0 ||
-	    (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
+	if (n == 0 || (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
 		worker_lost(app);
 }
 
 static void
 apply_response(struct openbar *app)
 {
-	struct net_response	resp;
+	struct net_response resp;
 
 	if (ipc_decode(app->ipc_rbuf, sizeof(app->ipc_rbuf), &resp) == -1) {
 		strlcpy(app->pub_ip4, "N/A", sizeof(app->pub_ip4));
 		strlcpy(app->pub_ip6, "N/A", sizeof(app->pub_ip6));
 	} else {
 		if (resp.status_v4 == NET_OK)
-			strlcpy(app->pub_ip4, resp.addr_v4,
-			    sizeof(app->pub_ip4));
+			strlcpy(
+			    app->pub_ip4, resp.addr_v4, sizeof(app->pub_ip4));
 		else
 			strlcpy(app->pub_ip4, "N/A", sizeof(app->pub_ip4));
 		if (resp.status_v6 == NET_OK)
-			strlcpy(app->pub_ip6, resp.addr_v6,
-			    sizeof(app->pub_ip6));
+			strlcpy(
+			    app->pub_ip6, resp.addr_v6, sizeof(app->pub_ip6));
 		else
 			strlcpy(app->pub_ip6, "N/A", sizeof(app->pub_ip6));
 	}
@@ -753,13 +748,13 @@ apply_response(struct openbar *app)
 int
 main(int argc, char *argv[])
 {
-	struct openbar	 app;
-	struct xstate	 x;
-	const char	*confpath = NULL;
-	char		*resolved = NULL, *xauth = NULL;
-	char		 pledgestr[128];
-	struct pollfd	 pfds[2];
-	int		 opt, run_once = 0, xfd;
+	struct openbar app;
+	struct xstate  x;
+	const char    *confpath = NULL;
+	char	      *resolved = NULL, *xauth = NULL;
+	char	       pledgestr[128];
+	struct pollfd  pfds[2];
+	int	       opt, run_once = 0, xfd;
 
 	memset(&app, 0, sizeof(app));
 	memset(&x, 0, sizeof(x));
@@ -812,8 +807,7 @@ main(int argc, char *argv[])
 	if (xstate_open(&x, &app.conf) == -1)
 		goto fail;
 
-	if (app.conf.enabled[WIDGET_BAT] &&
-	    (app.apm_fd = apm_open()) == -1)
+	if (app.conf.enabled[WIDGET_BAT] && (app.apm_fd = apm_open()) == -1)
 		warn("cannot open /dev/apm; battery display unavailable");
 
 	if (unveil_parent(&app.conf, xauth) == -1)
@@ -832,7 +826,7 @@ main(int argc, char *argv[])
 		 * filesystem lock but cannot pledge.
 		 */
 		warnx("battery display requires APM_IOC_GETPOWER; "
-		    "display process remains unpledged");
+		      "display process remains unpledged");
 	} else {
 		build_pledge(pledgestr, sizeof(pledgestr), &app.conf);
 		if (pledge(pledgestr, NULL) == -1)
@@ -842,7 +836,7 @@ main(int argc, char *argv[])
 	xfd = ConnectionNumber(x.dpy);
 
 	while (!quit_flag) {
-		int	nfds = 1, pr;
+		int nfds = 1, pr;
 
 		reap_children(&app);
 		collect_due(&app);

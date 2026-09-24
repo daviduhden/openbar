@@ -36,12 +36,10 @@
  * corresponding widget to "N/A" and are never fatal.
  */
 
-#include "openbar.h"
-
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <sys/sensors.h>
 #include <sys/sysctl.h>
+#include <sys/time.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -54,23 +52,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <uvm/uvmexp.h>
 
+#include "openbar.h"
+
 /* Upper bound of sensor devices scanned for a CPU temperature. */
-#define SENSOR_DEV_MAX		64
+#define SENSOR_DEV_MAX 64
 
 /* Sensor value is expressed in microkelvin. */
-#define MICROKELVIN_FREEZING	273'150'000LL
+#define MICROKELVIN_FREEZING 273'150'000LL
 
-static void	collect_hostname(struct openbar *);
-static void	collect_date(struct openbar *);
-static void	collect_cpu(struct openbar *);
-static void	collect_mem(struct openbar *);
-static void	collect_load(struct openbar *);
-static void	collect_bat(struct openbar *);
-static void	collect_ifaddrs(struct openbar *);
-static int	cpu_sensor_find(struct openbar *);
+static void collect_hostname(struct openbar *);
+static void collect_date(struct openbar *);
+static void collect_cpu(struct openbar *);
+static void collect_mem(struct openbar *);
+static void collect_load(struct openbar *);
+static void collect_bat(struct openbar *);
+static void collect_ifaddrs(struct openbar *);
+static int  cpu_sensor_find(struct openbar *);
 
 void
 collect_widget(struct openbar *app, enum widget w)
@@ -127,8 +126,8 @@ collect_date(struct openbar *app)
 void
 collect_cpu_init(struct openbar *app)
 {
-	int	 mib[2] = {CTL_HW, HW_CPUSPEED};
-	size_t	 len = sizeof(app->cpu_mhz);
+	int    mib[2] = {CTL_HW, HW_CPUSPEED};
+	size_t len = sizeof(app->cpu_mhz);
 
 	if (sysctl(mib, 2, &app->cpu_mhz, &len, NULL, 0) == -1) {
 		app->cpu_have_freq = false;
@@ -146,8 +145,8 @@ collect_cpu_init(struct openbar *app)
 static int
 cpu_sensor_find(struct openbar *app)
 {
-	struct sensordev	sd;
-	int			mib[3], dev;
+	struct sensordev sd;
+	int		 mib[3], dev;
 
 	if (app->cpu_sensor != 0)
 		return app->cpu_sensor > 0 ? app->cpu_sensor - 1 : -1;
@@ -155,13 +154,13 @@ cpu_sensor_find(struct openbar *app)
 	mib[0] = CTL_HW;
 	mib[1] = HW_SENSORS;
 	for (dev = 0; dev < SENSOR_DEV_MAX; dev++) {
-		size_t	len = sizeof(sd);
+		size_t len = sizeof(sd);
 
 		mib[2] = dev;
 		if (sysctl(mib, 3, &sd, &len, NULL, 0) == -1) {
 			if (errno == ENOENT)
-				break;		/* end of device list */
-			continue;		/* ENXIO: hole in the list */
+				break; /* end of device list */
+			continue;      /* ENXIO: hole in the list */
 		}
 		if (strncmp(sd.xname, "cpu", 3) == 0 ||
 		    strncmp(sd.xname, "km", 2) == 0) {
@@ -176,9 +175,9 @@ cpu_sensor_find(struct openbar *app)
 static void
 collect_cpu(struct openbar *app)
 {
-	struct sensor	s;
-	size_t		len = sizeof(s);
-	int		dev, mib[5];
+	struct sensor s;
+	size_t	      len = sizeof(s);
+	int	      dev, mib[5];
 
 	dev = cpu_sensor_find(app);
 	mib[0] = CTL_HW;
@@ -188,8 +187,8 @@ collect_cpu(struct openbar *app)
 	mib[4] = 0;
 	if (dev >= 0 && sysctl(mib, 5, &s, &len, NULL, 0) != -1 &&
 	    (s.flags & SENSOR_FINVALID) == 0) {
-		app->cpu_temp = (int)((s.value - MICROKELVIN_FREEZING) /
-		    1'000'000);
+		app->cpu_temp =
+		    (int)((s.value - MICROKELVIN_FREEZING) / 1'000'000);
 		app->cpu_have_temp = true;
 		return;
 	}
@@ -199,9 +198,9 @@ collect_cpu(struct openbar *app)
 static void
 collect_mem(struct openbar *app)
 {
-	struct uvmexp	uv;
-	int		mib[2] = {CTL_VM, VM_UVMEXP};
-	size_t		len = sizeof(uv);
+	struct uvmexp uv;
+	int	      mib[2] = {CTL_VM, VM_UVMEXP};
+	size_t	      len = sizeof(uv);
 
 	if (sysctl(mib, 2, &uv, &len, NULL, 0) == -1) {
 		app->mem_valid = false;
@@ -226,7 +225,7 @@ collect_load(struct openbar *app)
 static void
 collect_bat(struct openbar *app)
 {
-	struct apm_power_info	pi;
+	struct apm_power_info pi;
 
 	app->bat_pct = -1;
 	if (app->apm_fd == -1)
@@ -248,8 +247,8 @@ collect_bat(struct openbar *app)
 static void
 collect_ifaddrs(struct openbar *app)
 {
-	struct ifaddrs		*ifap, *ifa;
-	struct sockaddr_in	*sa;
+	struct ifaddrs	   *ifap, *ifa;
+	struct sockaddr_in *sa;
 
 	app->vpn_up = false;
 	strlcpy(app->int_ip4, "N/A", sizeof(app->int_ip4));
@@ -264,20 +263,20 @@ collect_ifaddrs(struct openbar *app)
 		if (app->conf.interface != NULL &&
 		    strcmp(ifa->ifa_name, app->conf.interface) == 0 &&
 		    ifa->ifa_addr->sa_family == AF_INET) {
-			char	buf[ADDR4_STRLEN];
+			char buf[ADDR4_STRLEN];
 
 			sa = (struct sockaddr_in *)ifa->ifa_addr;
 			if (inet_ntop(AF_INET, &sa->sin_addr, buf,
-			    sizeof(buf)) != NULL)
-				strlcpy(app->int_ip4, buf,
-				    sizeof(app->int_ip4));
+				sizeof(buf)) != NULL)
+				strlcpy(
+				    app->int_ip4, buf, sizeof(app->int_ip4));
 		}
 
 		if (strncmp(ifa->ifa_name, "wg", 2) == 0 &&
 		    (ifa->ifa_flags & IFF_UP) &&
 		    (ifa->ifa_flags & IFF_RUNNING) &&
 		    (ifa->ifa_addr->sa_family == AF_INET ||
-		     ifa->ifa_addr->sa_family == AF_INET6))
+			ifa->ifa_addr->sa_family == AF_INET6))
 			app->vpn_up = true;
 	}
 	freeifaddrs(ifap);

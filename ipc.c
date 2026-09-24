@@ -34,15 +34,16 @@
  * the host test suite.  The wire format is described in openbar.h.
  */
 
-#include "openbar.h"
-
 #include <sys/socket.h>
 
 #include <netinet/in.h>
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "openbar.h"
 
 /*
  * The response frame is a cross-process contract: both peers run the
@@ -51,14 +52,13 @@
  * offsetof() is an integer constant expression, so these checks are
  * free at run time.
  */
-static_assert(sizeof(struct net_response) == 65,
-    "net_response layout changed");
+static_assert(sizeof(struct net_response) == 65, "net_response layout changed");
 static_assert(offsetof(struct net_response, status_v4) == 1,
     "net_response layout changed");
 static_assert(offsetof(struct net_response, status_v6) == 2,
     "net_response layout changed");
-static_assert(offsetof(struct net_response, addr_v4) == 3,
-    "net_response layout changed");
+static_assert(
+    offsetof(struct net_response, addr_v4) == 3, "net_response layout changed");
 static_assert(offsetof(struct net_response, addr_v6) == 3 + ADDR4_STRLEN,
     "net_response layout changed");
 static_assert(ADDR4_STRLEN >= INET_ADDRSTRLEN,
@@ -74,11 +74,11 @@ static_assert(ADDR6_STRLEN >= INET6_ADDRSTRLEN,
 ssize_t
 read_full(int fd, void *buf, size_t n)
 {
-	size_t	 left = n;
-	char	*p = buf;
+	size_t left = n;
+	char  *p = buf;
 
 	while (left > 0) {
-		ssize_t	r = read(fd, p, left);
+		ssize_t r = read(fd, p, left);
 
 		if (r == -1) {
 			if (errno == EINTR)
@@ -97,11 +97,11 @@ read_full(int fd, void *buf, size_t n)
 ssize_t
 write_full(int fd, const void *buf, size_t n)
 {
-	size_t		 left = n;
-	const char	*p = buf;
+	size_t	    left = n;
+	const char *p = buf;
 
 	while (left > 0) {
-		ssize_t	r = write(fd, p, left);
+		ssize_t r = write(fd, p, left);
 
 		if (r == -1) {
 			if (errno == EINTR)
@@ -118,7 +118,7 @@ write_full(int fd, const void *buf, size_t n)
 int
 valid_ip(const char *s, int family)
 {
-	unsigned char	buf[sizeof(struct in6_addr)];
+	unsigned char buf[sizeof(struct in6_addr)];
 
 	if (s == NULL || s[0] == '\0')
 		return 0;
@@ -128,16 +128,16 @@ valid_ip(const char *s, int family)
 int
 ipc_send_fetch(int fd)
 {
-	uint8_t	cmd = IPC_CMD_FETCH;
+	uint8_t cmd = IPC_CMD_FETCH;
 
-	return write_full(fd, &cmd, sizeof(cmd)) == (ssize_t)sizeof(cmd) ?
-	    0 : -1;
+	return write_full(fd, &cmd, sizeof(cmd)) == (ssize_t)sizeof(cmd) ? 0 :
+									   -1;
 }
 
 static void
 copybounded(char *dst, const char *src, size_t dstsz)
 {
-	size_t	len;
+	size_t len;
 
 	if (dstsz == 0)
 		return;
@@ -177,7 +177,7 @@ ipc_encode(struct net_response *resp, int status_v4, const char *addr_v4,
 int
 ipc_decode(const unsigned char *buf, size_t len, struct net_response *out)
 {
-	struct net_response	r;
+	struct net_response r;
 
 	if (buf == NULL || len != sizeof(r))
 		return -1;

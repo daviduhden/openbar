@@ -34,15 +34,15 @@
  * produces display strings.  No X11 or kernel interfaces.
  */
 
-#include "openbar.h"
-
 #include <locale.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
+#include "openbar.h"
+
 /* The cwm-style bar: "logo | widget | widget |". */
-#define SEPARATOR	" |"
+#define SEPARATOR " |"
 
 /*
  * English day and month abbreviations for the date widget.  The bar
@@ -51,13 +51,10 @@
  * used for them.
  */
 static const char *const day_abbrev[7] = {
-	"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
-};
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-static const char *const month_abbrev[12] = {
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
+static const char *const month_abbrev[12] = {"Jan", "Feb", "Mar", "Apr", "May",
+    "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 /*
  * Pin the C locale before anything is formatted or parsed.  openbar
@@ -80,30 +77,27 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 
 	switch (w) {
 	case WIDGET_HOSTNAME:
-		snprintf(out->text, sizeof(out->text), "%s",
-		    app->hostname);
+		snprintf(out->text, sizeof(out->text), "%s", app->hostname);
 		break;
 	case WIDGET_DATE: {
-		struct tm	tm;
+		struct tm tm;
 
 		if (app->now == (time_t)-1 ||
-		    localtime_r(&app->now, &tm) == NULL ||
-		    tm.tm_wday < 0 || tm.tm_wday > 6 ||
-		    tm.tm_mon < 0 || tm.tm_mon > 11) {
+		    localtime_r(&app->now, &tm) == NULL || tm.tm_wday < 0 ||
+		    tm.tm_wday > 6 || tm.tm_mon < 0 || tm.tm_mon > 11) {
 			snprintf(out->text, sizeof(out->text), "N/A");
 		} else {
 			snprintf(out->text, sizeof(out->text),
 			    "%s %02d %s %02d:%02d", day_abbrev[tm.tm_wday],
-			    tm.tm_mday, month_abbrev[tm.tm_mon],
-			    tm.tm_hour, tm.tm_min);
+			    tm.tm_mday, month_abbrev[tm.tm_mon], tm.tm_hour,
+			    tm.tm_min);
 		}
 		break;
 	}
 	case WIDGET_CPU:
 		if (app->cpu_have_freq && app->cpu_have_temp)
 			snprintf(out->text, sizeof(out->text),
-			    "CPU: %4uMHz (%d C)", app->cpu_mhz,
-			    app->cpu_temp);
+			    "CPU: %4uMHz (%d C)", app->cpu_mhz, app->cpu_temp);
 		else if (app->cpu_have_freq)
 			snprintf(out->text, sizeof(out->text),
 			    "CPU: %4uMHz (x)", app->cpu_mhz);
@@ -111,31 +105,28 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 			snprintf(out->text, sizeof(out->text),
 			    "CPU: N/A (%d C)", app->cpu_temp);
 		else
-			snprintf(out->text, sizeof(out->text),
-			    "CPU: N/A (x)");
+			snprintf(out->text, sizeof(out->text), "CPU: N/A (x)");
 		break;
 	case WIDGET_MEM:
 		if (app->mem_valid)
-			snprintf(out->text, sizeof(out->text),
-			    "Mem: %llu MB", app->mem_free_mb);
+			snprintf(out->text, sizeof(out->text), "Mem: %llu MB",
+			    app->mem_free_mb);
 		else
-			snprintf(out->text, sizeof(out->text),
-			    "Mem: N/A");
+			snprintf(out->text, sizeof(out->text), "Mem: N/A");
 		break;
 	case WIDGET_LOAD:
 		if (app->load_valid)
-			snprintf(out->text, sizeof(out->text),
-			    "Load: %.2f", app->load1);
+			snprintf(out->text, sizeof(out->text), "Load: %.2f",
+			    app->load1);
 		else
-			snprintf(out->text, sizeof(out->text),
-			    "Load: N/A");
+			snprintf(out->text, sizeof(out->text), "Load: N/A");
 		break;
 	case WIDGET_BAT:
 		if (app->bat_pct < 0)
 			snprintf(out->text, sizeof(out->text), "Bat: N/A");
 		else {
-			snprintf(out->text, sizeof(out->text),
-			    "Bat: %d%%", app->bat_pct);
+			snprintf(out->text, sizeof(out->text), "Bat: %d%%",
+			    app->bat_pct);
 			if (app->bat_pct <= 15)
 				out->urgent = true;
 		}
@@ -145,9 +136,8 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 		    app->vpn_up ? "VPN" : "No VPN");
 		break;
 	case WIDGET_NET:
-		snprintf(out->text, sizeof(out->text),
-		    "IPs: %s | %s ~ %s", app->pub_ip4, app->pub_ip6,
-		    app->int_ip4);
+		snprintf(out->text, sizeof(out->text), "IPs: %s | %s ~ %s",
+		    app->pub_ip4, app->pub_ip6, app->int_ip4);
 		break;
 	default:
 		out->text[0] = '\0';
@@ -163,11 +153,11 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 static size_t
 utf8_truncate_boundary(const char *src, size_t keep)
 {
-	size_t	i, last = 0;
+	size_t i, last = 0;
 
 	for (i = 0; i < keep;) {
-		unsigned char	c = (unsigned char)src[i];
-		size_t		clen, j;
+		unsigned char c = (unsigned char)src[i];
+		size_t	      clen, j;
 
 		if (c < 0x80) {
 			i++;
@@ -175,16 +165,16 @@ utf8_truncate_boundary(const char *src, size_t keep)
 			continue;
 		}
 		if (c < 0xC2 || c > 0xF4)
-			break;		/* stray or invalid lead byte */
+			break; /* stray or invalid lead byte */
 		clen = c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
 		if (i + clen > keep)
-			break;		/* sequence crosses the limit */
+			break; /* sequence crosses the limit */
 		for (j = 1; j < clen; j++) {
 			if (((unsigned char)src[i + j] & 0xC0) != 0x80)
 				break;
 		}
 		if (j < clen)
-			break;		/* malformed sequence */
+			break; /* malformed sequence */
 		i += clen;
 		last = i;
 	}
@@ -198,7 +188,7 @@ utf8_truncate_boundary(const char *src, size_t keep)
 static void
 bappend(char *dst, size_t dstsz, const char *src)
 {
-	size_t	pos, keep;
+	size_t pos, keep;
 
 	if (dstsz == 0)
 		return;
@@ -234,8 +224,8 @@ utf8_bounded_copy(char *dst, const char *src, size_t dstsz)
 void
 compose_bar(struct openbar *app)
 {
-	char		line[BAR_TEXT_MAX];
-	unsigned int	i;
+	char	     line[BAR_TEXT_MAX];
+	unsigned int i;
 
 	line[0] = '\0';
 	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {

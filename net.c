@@ -47,33 +47,33 @@
  * still trusted for correctness.
  */
 
-#include "openbar.h"
-
 #include <sys/socket.h>
 
-#include <netdb.h>
 #include <netinet/in.h>
 
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <poll.h>
 #include <signal.h>
 #include <string.h>
 #include <tls.h>
 #include <unistd.h>
 
-#define PUBLIC_HOST		"ifconfig.me"
-#define PUBLIC_PORT		"443"
-#define PUBLIC_PATH		"/ip"
-#define REQUEST_TIMEOUT		5	/* seconds, per socket operation */
-#define RESPONSE_MAX		1024	/* bound on the whole HTTP reply */
+#include "openbar.h"
 
-static int	http_fetch(int, char *, size_t);
-static int	tcp_connect(struct addrinfo *);
-static int	set_timeouts(int);
-static int	parse_response(const char *, int, char *, size_t);
-static int	unveil_worker(void);
+#define PUBLIC_HOST "ifconfig.me"
+#define PUBLIC_PORT "443"
+#define PUBLIC_PATH "/ip"
+#define REQUEST_TIMEOUT 5 /* seconds, per socket operation */
+#define RESPONSE_MAX 1024 /* bound on the whole HTTP reply */
+
+static int http_fetch(int, char *, size_t);
+static int tcp_connect(struct addrinfo *);
+static int set_timeouts(int);
+static int parse_response(const char *, int, char *, size_t);
+static int unveil_worker(void);
 
 /*
  * Open a TCP connection to one address of the chain, bounding the
@@ -83,9 +83,9 @@ static int	unveil_worker(void);
 static int
 tcp_connect(struct addrinfo *ai)
 {
-	struct pollfd	pfd;
-	socklen_t	errlen;
-	int		fd, flags, err;
+	struct pollfd pfd;
+	socklen_t     errlen;
+	int	      fd, flags, err;
 
 	fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 	if (fd == -1)
@@ -118,7 +118,7 @@ fail:
 static int
 set_timeouts(int fd)
 {
-	struct timeval	tv = { .tv_sec = REQUEST_TIMEOUT };
+	struct timeval tv = {.tv_sec = REQUEST_TIMEOUT};
 
 	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1)
 		return -1;
@@ -134,15 +134,15 @@ set_timeouts(int fd)
 static int
 http_fetch(int family, char *out, size_t outlen)
 {
-	struct addrinfo		 hints, *res, *ai;
-	struct tls_config	*tls_cfg;
-	struct tls		*ctx;
-	char			 buf[RESPONSE_MAX];
-	const char		 req[] =
-	    "GET /ip HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n";
-	size_t			 total;
-	int			 sockfd, rc;
-	ssize_t			 n;
+	struct addrinfo	   hints, *res, *ai;
+	struct tls_config *tls_cfg;
+	struct tls	  *ctx;
+	char		   buf[RESPONSE_MAX];
+	const char	   req[] = "GET /ip HTTP/1.1\r\nHost: "
+			   "ifconfig.me\r\nConnection: close\r\n\r\n";
+	size_t	total;
+	int	sockfd, rc;
+	ssize_t n;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = family;
@@ -187,7 +187,7 @@ http_fetch(int family, char *out, size_t outlen)
 	while (total < sizeof(req) - 1) {
 		n = tls_write(ctx, req + total, sizeof(req) - 1 - total);
 		if (n == TLS_WANT_POLLIN || n == TLS_WANT_POLLOUT)
-			continue;	/* blocking fd: retry immediately */
+			continue; /* blocking fd: retry immediately */
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
@@ -204,16 +204,16 @@ http_fetch(int family, char *out, size_t outlen)
 	total = 0;
 	for (;;) {
 		if (total == sizeof(buf) - 1) {
-			rc = NET_ERR_PARSE;	/* oversized response */
+			rc = NET_ERR_PARSE; /* oversized response */
 			goto done;
 		}
 		n = tls_read(ctx, buf + total, sizeof(buf) - 1 - total);
 		if (n == TLS_WANT_POLLIN || n == TLS_WANT_POLLOUT)
-			continue;	/* blocking fd: retry immediately */
+			continue; /* blocking fd: retry immediately */
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
-			rc = NET_ERR_RECV;	/* includes timeouts */
+			rc = NET_ERR_RECV; /* includes timeouts */
 			goto done;
 		}
 		if (n == 0)
@@ -237,8 +237,8 @@ done:
 static int
 parse_response(const char *buf, int family, char *out, size_t outlen)
 {
-	const char	*body, *end;
-	size_t		 len;
+	const char *body, *end;
+	size_t	    len;
 
 	if (strncmp(buf, "HTTP/1.1 200", 12) != 0 &&
 	    strncmp(buf, "HTTP/1.0 200", 12) != 0)
@@ -248,8 +248,9 @@ parse_response(const char *buf, int family, char *out, size_t outlen)
 		return NET_ERR_PARSE;
 	body += 4;
 	end = body + strlen(body);
-	while (end > body && (end[-1] == '\r' || end[-1] == '\n' ||
-	    end[-1] == ' ' || end[-1] == '\t'))
+	while (end > body &&
+	    (end[-1] == '\r' || end[-1] == '\n' || end[-1] == ' ' ||
+		end[-1] == '\t'))
 		end--;
 	len = (size_t)(end - body);
 	if (len == 0 || len >= outlen)
@@ -262,10 +263,10 @@ parse_response(const char *buf, int family, char *out, size_t outlen)
 void
 net_worker(int fd)
 {
-	char			a4[ADDR4_STRLEN], a6[ADDR6_STRLEN];
-	struct net_response	resp;
-	uint8_t			cmd;
-	int			s4, s6;
+	char		    a4[ADDR4_STRLEN], a6[ADDR6_STRLEN];
+	struct net_response resp;
+	uint8_t		    cmd;
+	int		    s4, s6;
 
 	signal(SIGPIPE, SIG_IGN);
 	if (tls_init() == -1)
@@ -278,8 +279,8 @@ net_worker(int fd)
 			continue;
 		s4 = http_fetch(AF_INET, a4, sizeof(a4));
 		s6 = http_fetch(AF_INET6, a6, sizeof(a6));
-		ipc_encode(&resp, s4, s4 == NET_OK ? a4 : NULL,
-		    s6, s6 == NET_OK ? a6 : NULL);
+		ipc_encode(&resp, s4, s4 == NET_OK ? a4 : NULL, s6,
+		    s6 == NET_OK ? a6 : NULL);
 		if (write_full(fd, &resp, sizeof(resp)) !=
 		    (ssize_t)sizeof(resp))
 			_exit(0);
@@ -314,7 +315,7 @@ unveil_worker(void)
 int
 net_worker_start(struct openbar *app)
 {
-	int	sv[2];
+	int sv[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1)
 		return -1;
@@ -325,7 +326,7 @@ net_worker_start(struct openbar *app)
 		return -1;
 	}
 	if (app->ipc_pid == 0) {
-		struct sigaction	sa;
+		struct sigaction sa;
 
 		/* drop the parent's signal handlers so the worker can
 		 * be terminated normally */
