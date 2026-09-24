@@ -5,13 +5,14 @@
 
 .SUFFIXES: .c .o
 
-# Toolchain: clang(1) to build, lldb(1) to debug.
+# Toolchain: clang(1) with C23 support (clang >= 18) to build,
+# lldb(1) to debug.
 CC = clang
 DEBUGGER = lldb
 DBGFLAGS = -O0 -g
 
 CFLAGS ?= -O2 -pipe
-CFLAGS += -std=c17 -Wall -Wextra -Wpedantic
+CFLAGS += -std=c23 -Wall -Wextra -Wpedantic
 CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
 LDLIBS += -L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
 LDLIBS += -ltls

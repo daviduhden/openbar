@@ -1,13 +1,13 @@
 # Development
 
-`openbar` is deliberately small: a two-process OpenBSD status bar in ISO C17.
+`openbar` is deliberately small: a two-process OpenBSD status bar in ISO C23.
 This document describes the internal architecture and the invariants that
 matter when changing it.
 
 ## Layout
 
 ```
-openbar.h     shared ISO C17 declarations (struct conf, struct openbar,
+openbar.h     shared ISO C23 declarations (struct conf, struct openbar,
               widget ids, IPC frame); includes only standard headers
 config.c      configuration discovery + cwm-style parser (portable)
 fmt.c         widget formatting + bar line composition (portable)
@@ -19,7 +19,7 @@ openbar.c     display process: X11/Xft, event loop, refresh scheduling,
 tests/        host tests for the portable units and the locale policy
 ```
 
-The portable units (`config.c`, `fmt.c`, `ipc.c`) contain only ISO C17 and
+The portable units (`config.c`, `fmt.c`, `ipc.c`) contain only ISO C23 and
 POSIX interfaces available on any test host; they are what `make test`
 compiles and runs.  The OpenBSD units are verified against the real OpenBSD
 and Xenocara headers on the target, but their logic is exercised indirectly
@@ -124,7 +124,7 @@ The protocol is described in `openbar.h`:
 
 - request: one byte, `IPC_CMD_FETCH`;
 - response: a fixed 65-byte frame (magic byte, v4/v6 status codes, two
-  address strings), layout checked with `_Static_assert`.
+  address strings), layout checked with `static_assert`.
 
 Both peers run the same program image (`fork(2)`, no `exec`), so padding is
 irrelevant, but the decoder (`ipc_decode`) still validates the magic byte,
@@ -194,7 +194,7 @@ committing:
 
 ```sh
 make test
-clang -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
+clang -std=c23 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
      -Wshadow -Wformat=2 -Wundef -Wpointer-arith -Wstrict-prototypes \
      -Wmissing-prototypes -Werror -fsyntax-only config.c fmt.c ipc.c ...
 clang --analyze ...

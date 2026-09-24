@@ -1,5 +1,5 @@
 /*
- * Widget formatting and bar composition tests.  Pure C17, host-runnable.
+ * Widget formatting and bar composition tests.  Pure C23, host-runnable.
  */
 
 #include "test.h"

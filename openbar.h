@@ -33,14 +33,24 @@
  *
  * This header contains only ISO C declarations so that the portable
  * translation units (config.c, fmt.c, ipc.c) can be compiled and
- * tested on any C17 host.  OpenBSD- and X11-specific details live in
+ * tested on any C23 host.  OpenBSD- and X11-specific details live in
  * widgets.c, net.c and openbar.c.
  */
 
 #ifndef OPENBAR_H
 #define OPENBAR_H
 
-#include <stdbool.h>
+/*
+ * The project requires ISO C23: it relies on the bool/true/false and
+ * static_assert keywords, and on standard attributes such as
+ * [[nodiscard]] and [[noreturn]] that replaced the pre-C23 spellings.
+ * Reject older language modes with one clear diagnostic instead of a
+ * cascade of syntax errors.
+ */
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+#error "openbar requires ISO C23 (-std=c23)"
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>		/* pid_t */
@@ -103,7 +113,7 @@ struct witem {
 #define IPC_CMD_FETCH	0x01
 #define IPC_MAGIC	0x4f	/* 'O' */
 
-enum net_status {
+enum net_status : uint8_t {
 	NET_OK,
 	NET_ERR_DNS,
 	NET_ERR_CONNECT,
@@ -172,23 +182,24 @@ struct openbar {
 /* config.c */
 void			 conf_defaults(struct conf *);
 void			 conf_free(struct conf *);
-int			 conf_load(const char *, struct conf *);
-char			*conf_resolve_path(const char *);
-int			 widget_lookup(const char *);
+[[nodiscard]] int	 conf_load(const char *, struct conf *);
+[[nodiscard]] char	*conf_resolve_path(const char *);
+[[nodiscard]] int	 widget_lookup(const char *);
 extern const char *const default_colors[COLOR_NITEMS];
 extern const char	 default_font[];
 
 /* ipc.c */
-ssize_t	 read_full(int, void *, size_t);
-ssize_t	 write_full(int, const void *, size_t);
-int	 valid_ip(const char *, int);
-int	 ipc_send_fetch(int);
+[[nodiscard]] ssize_t	 read_full(int, void *, size_t);
+[[nodiscard]] ssize_t	 write_full(int, const void *, size_t);
+[[nodiscard]] int	 valid_ip(const char *, int);
+[[nodiscard]] int	 ipc_send_fetch(int);
 void	 ipc_encode(struct net_response *, int, const char *, int,
     const char *);
-int	 ipc_decode(const unsigned char *, size_t, struct net_response *);
+[[nodiscard]] int	 ipc_decode(const unsigned char *, size_t,
+    struct net_response *);
 
 /* fmt.c */
-int	 locale_init(void);
+[[nodiscard]] int	 locale_init(void);
 void	 fmt_widget(const struct openbar *, enum widget, struct witem *);
 void	 compose_bar(struct openbar *);
 void	 utf8_bounded_copy(char *, const char *, size_t);
@@ -196,10 +207,10 @@ void	 utf8_bounded_copy(char *, const char *, size_t);
 /* widgets.c (OpenBSD) */
 void	 collect_widget(struct openbar *, enum widget);
 void	 collect_cpu_init(struct openbar *);
-int	 apm_open(void);
+[[nodiscard]] int	 apm_open(void);
 
 /* net.c (OpenBSD network worker) */
 void	 net_worker(int);
-int	 net_worker_start(struct openbar *);
+[[nodiscard]] int	 net_worker_start(struct openbar *);
 
 #endif /* OPENBAR_H */

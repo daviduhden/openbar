@@ -30,7 +30,7 @@
 /*
  * Worker IPC codec and small descriptor helpers.
  *
- * Pure ISO C17: usable by the display process, the network worker and
+ * Pure ISO C23: usable by the display process, the network worker and
  * the host test suite.  The wire format is described in openbar.h.
  */
 
@@ -44,8 +44,27 @@
 #include <string.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(struct net_response) == 65,
+/*
+ * The response frame is a cross-process contract: both peers run the
+ * same program image, but the decoder also treats the worker as
+ * untrusted, so the layout and the address capacities must not drift.
+ * offsetof() is an integer constant expression, so these checks are
+ * free at run time.
+ */
+static_assert(sizeof(struct net_response) == 65,
     "net_response layout changed");
+static_assert(offsetof(struct net_response, status_v4) == 1,
+    "net_response layout changed");
+static_assert(offsetof(struct net_response, status_v6) == 2,
+    "net_response layout changed");
+static_assert(offsetof(struct net_response, addr_v4) == 3,
+    "net_response layout changed");
+static_assert(offsetof(struct net_response, addr_v6) == 3 + ADDR4_STRLEN,
+    "net_response layout changed");
+static_assert(ADDR4_STRLEN >= INET_ADDRSTRLEN,
+    "addr_v4 too small for inet_pton(3)/inet_ntop(3)");
+static_assert(ADDR6_STRLEN >= INET6_ADDRSTRLEN,
+    "addr_v6 too small for inet_pton(3)/inet_ntop(3)");
 
 /*
  * Read exactly n bytes (or until EOF).  Returns the number of bytes

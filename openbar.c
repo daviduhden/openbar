@@ -66,7 +66,6 @@
 #include <limits.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdnoreturn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,7 +95,7 @@ static void	 setup_signals(void);
 static void	 quit_handler(int);
 static void	 chld_handler(int);
 static int	 xerror_handler(Display *, XErrorEvent *);
-static int	 xio_handler(Display *);
+[[noreturn]] static int	 xio_handler(Display *);
 static char	*resolve_xauthority(void);
 static int	 unveil_parent(const struct conf *, const char *);
 static void	 build_pledge(char *, size_t, const struct conf *);
@@ -142,16 +141,14 @@ usage(FILE *f)
  * loop where no async-signal-safety restrictions apply.
  */
 static void
-quit_handler(int signo)
+quit_handler(int)
 {
-	(void)signo;
 	quit_flag = 1;
 }
 
 static void
-chld_handler(int signo)
+chld_handler(int)
 {
-	(void)signo;
 	chld_flag = 1;
 }
 
@@ -181,9 +178,8 @@ setup_signals(void)
  * disappeared, treat everything else as fatal.
  */
 static int
-xerror_handler(Display *dpy, XErrorEvent *ev)
+xerror_handler(Display *, XErrorEvent *ev)
 {
-	(void)dpy;
 	if (ev->error_code == BadWindow || ev->error_code == BadDrawable)
 		return 0;
 	warnx("X error: request %d.%d, error %d", ev->request_code,
@@ -195,10 +191,9 @@ xerror_handler(Display *dpy, XErrorEvent *ev)
  * Called by Xlib when the server connection dies.  The worker notices
  * the closed IPC descriptor and exits on its own.
  */
-static noreturn int
-xio_handler(Display *dpy)
+[[noreturn]] static int
+xio_handler(Display *)
 {
-	(void)dpy;
 	warnx("lost connection to X server");
 	_exit(EXIT_FAILURE);
 }
@@ -340,7 +335,7 @@ window_create(struct xstate *x, const struct conf *c)
 	unsigned long	bypass = 1;
 	int		sw = DisplayWidth(x->dpy, x->screen);
 	int		sh = DisplayHeight(x->dpy, x->screen);
-	int		w = sw - c->gap[2] - c->gap[3];
+	long		w = (long)sw - c->gap[2] - c->gap[3];
 	int		h = c->barheight;
 
 	if (w < 1) {
@@ -389,7 +384,7 @@ window_create(struct xstate *x, const struct conf *c)
 
 	XClearWindow(x->dpy, x->win);
 	XMapRaised(x->dpy, x->win);
-	x->w = w;
+	x->w = (int)w;
 	x->h = h;
 	return 0;
 }
@@ -895,6 +890,8 @@ main(int argc, char *argv[])
 fail:
 	if (app.ipc_fd != -1)
 		close(app.ipc_fd);
+	if (app.apm_fd != -1)
+		close(app.apm_fd);
 	free(xauth);
 	if (x.dpy != NULL)
 		xstate_close(&x);

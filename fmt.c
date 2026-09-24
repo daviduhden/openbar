@@ -30,7 +30,7 @@
 /*
  * Widget formatting and bar line composition.
  *
- * Pure ISO C17: takes collected metrics from struct openbar and
+ * Pure ISO C23: takes collected metrics from struct openbar and
  * produces display strings.  No X11 or kernel interfaces.
  */
 
@@ -65,7 +65,7 @@ static const char *const month_abbrev[12] = {
  * C locale keeps libc formatting deterministic everywhere: ASCII
  * decimal point, no digit grouping and English libc diagnostics.
  * Returns 0, or -1 if the C locale is unavailable (impossible on a
- * conforming C17 host, but the caller must not continue without it).
+ * conforming C23 host, but the caller must not continue without it).
  */
 int
 locale_init(void)
@@ -198,10 +198,13 @@ utf8_truncate_boundary(const char *src, size_t keep)
 static void
 bappend(char *dst, size_t dstsz, const char *src)
 {
-	size_t	pos = strlen(dst);
-	size_t	keep = strlen(src);
+	size_t	pos, keep;
 
-	if (dstsz == 0 || pos + 1 >= dstsz)
+	if (dstsz == 0)
+		return;
+	pos = strlen(dst);
+	keep = strlen(src);
+	if (pos + 1 >= dstsz)
 		return;
 	if (keep > dstsz - 1 - pos)
 		keep = dstsz - 1 - pos;
