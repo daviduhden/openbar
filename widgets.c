@@ -36,10 +36,18 @@
  * corresponding widget to "N/A" and are never fatal.
  */
 
+/*
+ * sys/sensors.h and sys/sysctl.h are not self-contained: the former
+ * needs struct timeval and int64_t, the latter u_int64_t and int32_t.
+ * Pull in sys/types.h (exact-width and BSD-style integer types) and
+ * sys/time.h before them.
+ */
+#include <sys/types.h>
+#include <sys/time.h>
+
 #include <sys/ioctl.h>
 #include <sys/sensors.h>
 #include <sys/sysctl.h>
-#include <sys/time.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
