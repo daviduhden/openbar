@@ -87,12 +87,10 @@ struct xstate {
 };
 
 static volatile sig_atomic_t quit_flag;
-static volatile sig_atomic_t chld_flag;
 
 static void		usage(FILE *);
 static void		setup_signals(void);
 static void		quit_handler(int);
-static void		chld_handler(int);
 static int		xerror_handler(Display *, XErrorEvent *);
 [[noreturn]] static int xio_handler(Display *);
 static char	       *resolve_xauthority(void);
@@ -108,7 +106,6 @@ static void		collect_due(struct openbar *);
 static void schedule(struct openbar *, enum widget, const struct timespec *);
 static int  next_timeout_ms(struct openbar *);
 static int  timespec_cmp(const struct timespec *, const struct timespec *);
-static void reap_children(struct openbar *);
 static void ipc_tick(struct openbar *);
 static void ipc_read(struct openbar *);
 static void apply_response(struct openbar *);
@@ -144,12 +141,6 @@ quit_handler(int)
 }
 
 static void
-chld_handler(int)
-{
-	chld_flag = 1;
-}
-
-static void
 setup_signals(void)
 {
 	struct sigaction sa;
@@ -165,7 +156,12 @@ setup_signals(void)
 	    sigaction(SIGINT, &sa, NULL) == -1)
 		err(1, "sigaction");
 
-	sa.sa_handler = chld_handler;
+	/*
+	 * Auto-reap the network worker.  After pledge(2) the display
+	 * process must not waitpid(2) (it needs "proc", deliberately not
+	 * retained); worker loss is detected through the IPC socket.
+	 */
+	sa.sa_handler = SIG_IGN;
 	if (sigaction(SIGCHLD, &sa, NULL) == -1)
 		err(1, "sigaction(SIGCHLD)");
 }
@@ -304,7 +300,7 @@ unveil_parent(const struct conf *c, const char *xauth_path)
  * Steady-state pledge(2) for the display process, derived from the
  * enabled widgets:
  *  - stdio: X11 socket I/O (read/write/poll/ioctl), the IPC
- *    descriptor, signal and child management, timing;
+ *    descriptor, signal handling and timing;
  *  - rpath: lazy fontconfig fallback loading, bounded by unveil;
  *  - vminfo: VM_UVMEXP for the memory widget;
  *  - route: getifaddrs(3) (NET_RT_IFLIST) for the network/VPN widgets.
@@ -630,28 +626,13 @@ next_timeout_ms(struct openbar *app)
 	return (int)ms;
 }
 
-static void
-reap_children(struct openbar *app)
-{
-	pid_t r;
-	int   status;
-
-	if (!chld_flag)
-		return;
-	chld_flag = 0;
-	while ((r = waitpid(-1, &status, WNOHANG)) > 0) {
-		if (app->ipc_pid > 0 && r == app->ipc_pid) {
-			app->ipc_pid = -1;
-			if (app->ipc_state != IPC_BROKEN)
-				worker_lost(app);
-		}
-	}
-}
-
 /*
  * The worker failed and cannot be restarted after pledge(2) (fork
- * requires 'proc', deliberately not retained): drop the public address
- * functionality and keep the bar running.
+ * requires 'proc', which is deliberately not retained).  Close the IPC
+ * socket: the worker notices the EOF and exits on its own, and the
+ * ignored SIGCHLD disposition reaps it, so neither kill(2) nor
+ * waitpid(2) is needed -- both would require 'proc'.  Keep the bar
+ * running without the public address.
  */
 static void
 worker_lost(struct openbar *app)
@@ -660,8 +641,7 @@ worker_lost(struct openbar *app)
 		close(app->ipc_fd);
 		app->ipc_fd = -1;
 	}
-	if (app->ipc_pid > 0)
-		kill(app->ipc_pid, SIGTERM);
+	app->ipc_pid = -1;
 	app->ipc_state = IPC_BROKEN;
 	strlcpy(app->pub_ip4, "N/A", sizeof(app->pub_ip4));
 	strlcpy(app->pub_ip6, "N/A", sizeof(app->pub_ip6));
@@ -838,7 +818,6 @@ main(int argc, char *argv[])
 	while (!quit_flag) {
 		int nfds = 1, pr;
 
-		reap_children(&app);
 		collect_due(&app);
 		if (app.dirty)
 			redraw(&app, &x);
