@@ -223,13 +223,24 @@ exists, the display process therefore remains unpledged and prints a
 warning; its unveil policy is still locked.
 .Ss Network worker
 The worker runs under
-.Dq stdio inet dns
+.Dq stdio rpath inet dns
 with filesystem visibility locked to
 .Pa /etc/resolv.conf ,
 .Pa /etc/hosts
 and
 .Pa /etc/ssl/cert.pem
 .Pq all read-only .
+The
+.Dq dns
+promise lets the resolver read
+.Pa /etc/resolv.conf ,
+.Pa /etc/hosts
+and
+.Pa /etc/services ;
+.Dq rpath
+is still required because libtls opens the CA bundle
+.Pa /etc/ssl/cert.pem
+to verify the server certificate.
 The service port is numeric, so
 .Pa /etc/services
 is never consulted.

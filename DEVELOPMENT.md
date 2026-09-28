@@ -75,7 +75,7 @@ parse arguments (getopt)
 -> load configuration (fatal on malformed values)
 -> tzset(3)                cache zoneinfo before the unveil lock
 -> fork network worker     only if "net" is enabled; the child unveils and
-                           pledges itself ("stdio inet dns")
+                           pledges itself ("stdio rpath inet dns")
 -> XOpenDisplay, allocate Xft colours, open the font, create the window
 -> open /dev/apm           only if "bat" is enabled
 -> sample hw.cpuspeed      once; not pledge-readable later
@@ -155,8 +155,9 @@ IPv6, sequentially):
 5. response parsing: status line must be `200`, body must be exactly one
    address of the requested family, total response capped at 1024 bytes.
 
-`libtls` and `libcrypto` are userland code; `stdio inet dns` is sufficient
-for them.
+`libtls` and `libcrypto` are userland code; they need `rpath` in addition to
+`stdio inet dns` because libtls opens `/etc/ssl/cert.pem` to verify the
+server certificate (`dns` alone only covers the resolver files).
 
 ## Sandbox notes
 

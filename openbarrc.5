@@ -62,13 +62,15 @@ The default is
 .It Ic gap Ar top bottom left right
 Define a gap in pixels at each edge of the screen.
 Exactly four non-negative values are required.
-The bar window is placed within this gap so that it does not overlap
-other screen-edge elements.
+The bar window, which is not managed by the window manager, is placed
+at this gap so that it does not overlap other screen-edge elements.
 The default is
 .Dq 0 0 0 0 .
 .It Ic interface Ar name
-Set the network interface name used to read the private IPv4
-address.
+Set the preferred network interface name used to read the private
+IPv4 address.
+If the interface does not exist or has no IPv4 address, the first
+usable non-loopback interface is used instead.
 The name must be at most 15 characters and may contain letters,
 digits, underscore, dash and dot.
 .It Ic logo Ar text
