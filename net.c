@@ -310,7 +310,13 @@ unveil_worker(void)
  * Create the worker.  Called by the display process before it pledges.
  * The child closes the parent's IPC end and the standard input and
  * output (stderr stays for diagnostics), locks its filesystem view and
- * drops to "stdio inet dns" before serving requests.
+ * drops to "stdio rpath inet dns" before serving requests.
+ *
+ * "rpath" is required: the "dns" promise only lets the resolver read
+ * resolv.conf(5), hosts(5), services(5) and protocols(5), while libtls
+ * still opens the CA bundle (unveiled above) to verify the server
+ * certificate.  Without it the worker is killed by pledge(2) on the
+ * first fetch.
  */
 int
 net_worker_start(struct openbar *app)
@@ -341,7 +347,7 @@ net_worker_start(struct openbar *app)
 		close(STDOUT_FILENO);
 		if (unveil_worker() == -1)
 			_exit(1);
-		if (pledge("stdio inet dns", NULL) == -1)
+		if (pledge("stdio rpath inet dns", NULL) == -1)
 			err(1, "pledge: network worker");
 		net_worker(sv[0]);
 		_exit(0);

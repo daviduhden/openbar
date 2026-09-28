@@ -118,8 +118,10 @@ is locked to the X11 socket directory, the X authority file, the standard
 fontconfig directories and, only when the battery widget is enabled,
 `/dev/apm`.
 
-The network worker pledges `stdio inet dns` and sees only
-`/etc/resolv.conf`, `/etc/hosts` and `/etc/ssl/cert.pem`.  Public addresses
+The network worker pledges `stdio rpath inet dns` and sees only
+`/etc/resolv.conf`, `/etc/hosts` and `/etc/ssl/cert.pem` (`dns` covers the
+resolver files; `rpath` is needed because libtls opens the CA bundle).
+Public addresses
 are fetched over **HTTPS** with [libtls](https://man.openbsd.org/tls_init.3),
 so an on-path attacker cannot substitute another address without a valid
 certificate; responses are bounded and validated with `inet_pton(3)` before
@@ -147,6 +149,10 @@ For `cwm`, leave a gap at the top of the screen for the bar in your `.cwmrc`:
 ```
 gap 24 0 0 0
 ```
+
+The bar window is not managed by the window manager, so it stays exactly at
+the configured `gap`; the cwm gap only keeps maximized windows from covering
+it.
 
 ## Building
 

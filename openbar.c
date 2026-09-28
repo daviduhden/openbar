@@ -325,6 +325,7 @@ window_create(struct xstate *x, const struct conf *c)
 	Atom	      wm_type_dock, wm_skip_taskbar, wm_skip_pager, wm_sticky;
 	Atom	      wm_state_atoms[4];
 	unsigned long bypass = 1;
+	XSetWindowAttributes attrs;
 	int	      sw = DisplayWidth(x->dpy, x->screen);
 	int	      sh = DisplayHeight(x->dpy, x->screen);
 	long	      w = (long)sw - c->gap[2] - c->gap[3];
@@ -341,6 +342,16 @@ window_create(struct xstate *x, const struct conf *c)
 	    c->gap[2], c->gap[0], (unsigned int)w, (unsigned int)h, 0,
 	    BlackPixel(x->dpy, x->screen), WhitePixel(x->dpy, x->screen));
 	XSelectInput(x->dpy, x->win, ExposureMask);
+
+	/*
+	 * Keep the bar exactly where gap[] puts it.  A managed window
+	 * would be placed by the window manager instead (cwm's "gap"
+	 * only reserves space for maximized windows, it does not place
+	 * new ones), so the bar could end up away from the top edge.
+	 * An override-redirect window is never managed or moved.
+	 */
+	attrs.override_redirect = True;
+	XChangeWindowAttributes(x->dpy, x->win, CWOverrideRedirect, &attrs);
 
 	/* EWMH: a dock window on every desktop, kept above */
 	wm_state = XInternAtom(x->dpy, "_NET_WM_STATE", False);

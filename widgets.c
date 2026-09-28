@@ -255,8 +255,9 @@ collect_bat(struct openbar *app)
 static void
 collect_ifaddrs(struct openbar *app)
 {
-	struct ifaddrs	   *ifap, *ifa;
-	struct sockaddr_in *sa;
+	struct ifaddrs *ifap, *ifa;
+	char		fallback_ip[ADDR4_STRLEN] = "";
+	bool		have_ip = false;
 
 	app->vpn_up = false;
 	strlcpy(app->int_ip4, "N/A", sizeof(app->int_ip4));
@@ -268,16 +269,32 @@ collect_ifaddrs(struct openbar *app)
 		if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL)
 			continue;
 
-		if (app->conf.interface != NULL &&
-		    strcmp(ifa->ifa_name, app->conf.interface) == 0 &&
-		    ifa->ifa_addr->sa_family == AF_INET) {
+		/*
+		 * Private IPv4.  The configured interface wins; when it
+		 * is absent (or none is configured) fall back to the
+		 * first usable interface so the widget still shows an
+		 * address instead of N/A.
+		 */
+		if (!have_ip && ifa->ifa_addr->sa_family == AF_INET &&
+		    (ifa->ifa_flags & IFF_UP) &&
+		    !(ifa->ifa_flags & IFF_LOOPBACK)) {
+			struct sockaddr_in *sa =
+			    (struct sockaddr_in *)ifa->ifa_addr;
 			char buf[ADDR4_STRLEN];
 
-			sa = (struct sockaddr_in *)ifa->ifa_addr;
 			if (inet_ntop(AF_INET, &sa->sin_addr, buf,
-				sizeof(buf)) != NULL)
-				strlcpy(
-				    app->int_ip4, buf, sizeof(app->int_ip4));
+				sizeof(buf)) != NULL) {
+				if (app->conf.interface != NULL &&
+				    strcmp(ifa->ifa_name,
+					app->conf.interface) == 0) {
+					strlcpy(app->int_ip4, buf,
+					    sizeof(app->int_ip4));
+					have_ip = true;
+				} else if (fallback_ip[0] == '\0') {
+					strlcpy(fallback_ip, buf,
+					    sizeof(fallback_ip));
+				}
+			}
 		}
 
 		if (strncmp(ifa->ifa_name, "wg", 2) == 0 &&
@@ -288,6 +305,9 @@ collect_ifaddrs(struct openbar *app)
 			app->vpn_up = true;
 	}
 	freeifaddrs(ifap);
+
+	if (!have_ip && fallback_ip[0] != '\0')
+		strlcpy(app->int_ip4, fallback_ip, sizeof(app->int_ip4));
 }
 
 /*
