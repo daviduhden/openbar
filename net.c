@@ -139,10 +139,10 @@ http_fetch(int family, char *out, size_t outlen)
 	struct tls	  *ctx;
 	char		   buf[RESPONSE_MAX];
 	const char	   req[] = "GET /ip HTTP/1.1\r\nHost: "
-			   "ifconfig.me\r\nConnection: close\r\n\r\n";
-	size_t	total;
-	int	sockfd, rc;
-	ssize_t n;
+				   "ifconfig.me\r\nConnection: close\r\n\r\n";
+	size_t		   total;
+	int		   sockfd, rc;
+	ssize_t		   n;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = family;

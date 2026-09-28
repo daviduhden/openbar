@@ -41,7 +41,7 @@
 
 #include "openbar.h"
 
-/* The cwm-style bar: "logo | widget | widget |". */
+/* The cwm-style bar: "| logo | widget | widget |". */
 #define SEPARATOR " |"
 
 /*
@@ -229,12 +229,16 @@ compose_bar(struct openbar *app)
 
 	line[0] = '\0';
 	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {
+		bappend(line, sizeof(line), "| ");
 		bappend(line, sizeof(line), app->conf.logo);
 		bappend(line, sizeof(line), SEPARATOR);
 	}
 	for (i = 0; i < WIDGET_NITEMS; i++) {
 		if (!app->conf.enabled[i])
 			continue;
+		/* Open the line with a leading "| " before the first item. */
+		if (line[0] == '\0')
+			bappend(line, sizeof(line), "|");
 		fmt_widget(app, (enum widget)i, &app->seg[i]);
 		bappend(line, sizeof(line), " ");
 		bappend(line, sizeof(line), app->seg[i].text);
