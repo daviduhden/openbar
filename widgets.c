@@ -42,12 +42,14 @@
  * Pull in sys/types.h (exact-width and BSD-style integer types) and
  * sys/time.h before them.
  */
+/* clang-format off */
 #include <sys/types.h>
 #include <sys/time.h>
 
 #include <sys/ioctl.h>
 #include <sys/sensors.h>
 #include <sys/sysctl.h>
+/* clang-format on */
 
 #include <net/if.h>
 #include <netinet/in.h>

@@ -326,10 +326,10 @@ window_create(struct xstate *x, const struct conf *c)
 	Atom	      wm_state_atoms[4];
 	unsigned long bypass = 1;
 	XSetWindowAttributes attrs;
-	int	      sw = DisplayWidth(x->dpy, x->screen);
-	int	      sh = DisplayHeight(x->dpy, x->screen);
-	long	      w = (long)sw - c->gap[2] - c->gap[3];
-	int	      h = c->barheight;
+	int		     sw = DisplayWidth(x->dpy, x->screen);
+	int		     sh = DisplayHeight(x->dpy, x->screen);
+	long		     w = (long)sw - c->gap[2] - c->gap[3];
+	int		     h = c->barheight;
 
 	if (w < 1) {
 		warnx("horizontal gaps exceed screen width");
@@ -493,7 +493,9 @@ draw_line(struct openbar *app, struct xstate *x)
 	int	     nchunks = 0, total = 0, cx, cy;
 
 	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {
-		chunks[nchunks].text = app->conf.logo;
+		snprintf(texts[nchunks], sizeof(texts[nchunks]), "| %s",
+		    app->conf.logo);
+		chunks[nchunks].text = texts[nchunks];
 		chunks[nchunks].urgent = false;
 		nchunks++;
 		snprintf(texts[nchunks], sizeof(texts[nchunks]), " |");
@@ -504,6 +506,13 @@ draw_line(struct openbar *app, struct xstate *x)
 	for (i = 0; i < WIDGET_NITEMS; i++) {
 		if (!app->conf.enabled[i])
 			continue;
+		/* Open the line with a leading "| " before the first item. */
+		if (nchunks == 0) {
+			snprintf(texts[nchunks], sizeof(texts[nchunks]), "|");
+			chunks[nchunks].text = texts[nchunks];
+			chunks[nchunks].urgent = false;
+			nchunks++;
+		}
 		snprintf(texts[nchunks], sizeof(texts[nchunks]), " %s",
 		    app->seg[i].text);
 		chunks[nchunks].text = texts[nchunks];

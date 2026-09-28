@@ -188,7 +188,7 @@ test_compose(void)
 	app.mem_free_mb = 512;
 
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "OpenBar | puffy | Mem: 512 MB |");
+	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 512 MB |");
 	CHECK(app.dirty);
 
 	/* recomposing unchanged state must not mark it dirty again */
@@ -199,7 +199,7 @@ test_compose(void)
 	/* a metric change rebuilds the line */
 	app.mem_free_mb = 513;
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "OpenBar | puffy | Mem: 513 MB |");
+	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 513 MB |");
 	CHECK(app.dirty);
 
 	/* nothing enabled, no logo: empty line */
@@ -217,7 +217,7 @@ test_compose(void)
 	app.conf.enabled[WIDGET_BAT] = true;
 	app.bat_pct = 42;
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "OpenBar | Bat: 42% |");
+	CHECK_STR(app.bar_text, "| OpenBar | Bat: 42% |");
 	CHECK(app.dirty);
 	free(app.conf.logo);
 }
@@ -284,7 +284,7 @@ test_compose_utf8_logo(void)
 	memset(&app.conf, 0, sizeof(app.conf));
 	app.conf.logo = strdup("Café ☕");
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "Café ☕ |");
+	CHECK_STR(app.bar_text, "| Café ☕ |");
 	free(app.conf.logo);
 }
 
