@@ -16,6 +16,8 @@ widgets.c     kernel metric collection: sysctl(2), getifaddrs(3), /dev/apm
 net.c         network worker: HTTPS via libtls, worker sandbox, fork setup
 openbar.c     display process: X11/Xft, event loop, refresh scheduling,
               worker supervision, display-process sandbox
+compat/       embedded portability shims (<stdckdint.h>); on the include
+              path before the system headers
 tests/        host tests for the portable units and the locale policy
 ```
 
@@ -42,6 +44,13 @@ following C23 features where they apply:
 - empty initializers (`= {}`) for zero-initialised locals;
 - `<stdckdint.h>` (`ckd_add`/`ckd_sub`/`ckd_mul`) for size arithmetic;
 - digit separators in numeric literals.
+
+The OpenBSD base clang does not ship `<stdckdint.h>` yet, so `compat/`
+holds an embedded shim: it is placed on the include path (`-Icompat`),
+includes the real header with `include_next` when one is reachable, and
+otherwise defines the three macros in terms of the compiler's
+overflow-checked builtins (which is exactly what the standard header
+expands to).  The checked-arithmetic API is therefore always present.
 
 ## Locale policy
 

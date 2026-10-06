@@ -13,7 +13,9 @@ DBGFLAGS = -O0 -g
 
 CFLAGS ?= -O2 -pipe
 CFLAGS += -std=c23 -Wall -Wextra -Wpedantic
-CPPFLAGS += -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
+# compat/ must precede the system include directories so that its
+# <stdckdint.h> shim shadows the (often absent) system header.
+CPPFLAGS += -Icompat -I/usr/X11R6/include -I/usr/X11R6/include/freetype2
 LDLIBS += -L/usr/X11R6/lib -lX11 -lXft -lXrender -lfontconfig -lfreetype
 LDLIBS += -ltls
 
@@ -92,6 +94,7 @@ ${TEST_BINS}: ${TEST_OBJS} openbar.h tests/test.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
 
 test: ${TEST_BINS} test-locale
+	@CC="${CC}" CFLAGS="${CFLAGS}" sh compat/tests/run.sh
 	@for t in ${TEST_BINS}; do echo "==> $$t"; ./$$t || exit 1; done
 
 # Run the suite under a matrix of locale environments (English and
