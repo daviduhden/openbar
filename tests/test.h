@@ -28,13 +28,13 @@ static int test_failures;
 
 #define CHECK_STR(a, b)                                                        \
 	do {                                                                   \
-		const char *_a = (a);                                          \
-		const char *_b = (b);                                          \
-		if (_a == NULL || _b == NULL || strcmp(_a, _b) != 0) {         \
+		typeof((a) + 0) _a = (a);                                      \
+		typeof((b) + 0) _b = (b);                                      \
+		if (_a == nullptr || _b == nullptr || strcmp(_a, _b) != 0) {   \
 			fprintf(stderr,                                        \
 			    "%s:%d: check failed: \"%s\" != \"%s\"\n",         \
-			    __FILE__, __LINE__, _a == NULL ? "(null)" : _a,    \
-			    _b == NULL ? "(null)" : _b);                       \
+			    __FILE__, __LINE__, _a == nullptr ? "(null)" : _a, \
+			    _b == nullptr ? "(null)" : _b);                    \
 			test_failures++;                                       \
 		}                                                              \
 	} while (0)

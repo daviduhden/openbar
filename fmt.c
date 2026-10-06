@@ -35,11 +35,16 @@
  */
 
 #include <locale.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #include "openbar.h"
+
+/* A widget segment must always fit inside the whole bar line. */
+static_assert(
+    WITEM_TEXT_MAX <= BAR_TEXT_MAX, "widget segment exceeds bar line");
 
 /* The cwm-style bar: "| logo | widget | widget |". */
 #define SEPARATOR " |"
@@ -67,7 +72,7 @@ static const char *const month_abbrev[12] = {"Jan", "Feb", "Mar", "Apr", "May",
 int
 locale_init(void)
 {
-	return setlocale(LC_ALL, "C") == NULL ? -1 : 0;
+	return setlocale(LC_ALL, "C") == nullptr ? -1 : 0;
 }
 
 void
@@ -80,10 +85,10 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 		snprintf(out->text, sizeof(out->text), "%s", app->hostname);
 		break;
 	case WIDGET_DATE: {
-		struct tm tm;
+		struct tm tm = {};
 
 		if (app->now == (time_t)-1 ||
-		    localtime_r(&app->now, &tm) == NULL || tm.tm_wday < 0 ||
+		    localtime_r(&app->now, &tm) == nullptr || tm.tm_wday < 0 ||
 		    tm.tm_wday > 6 || tm.tm_mon < 0 || tm.tm_mon > 11) {
 			snprintf(out->text, sizeof(out->text), "N/A");
 		} else {
@@ -156,8 +161,8 @@ utf8_truncate_boundary(const char *src, size_t keep)
 	size_t i, last = 0;
 
 	for (i = 0; i < keep;) {
-		unsigned char c = (unsigned char)src[i];
-		size_t	      clen, j;
+		typeof_unqual((unsigned char)src[i]) c = (unsigned char)src[i];
+		size_t clen, j;
 
 		if (c < 0x80) {
 			i++;
@@ -188,19 +193,23 @@ utf8_truncate_boundary(const char *src, size_t keep)
 static void
 bappend(char *dst, size_t dstsz, const char *src)
 {
-	size_t pos, keep;
+	size_t pos, keep, limit, end;
 
 	if (dstsz == 0)
 		return;
 	pos = strlen(dst);
 	keep = strlen(src);
-	if (pos + 1 >= dstsz)
+	if (ckd_add(&end, pos, 1) || end >= dstsz)
 		return;
-	if (keep > dstsz - 1 - pos)
-		keep = dstsz - 1 - pos;
+	if (ckd_sub(&limit, dstsz - 1, pos))
+		return;
+	if (keep > limit)
+		keep = limit;
 	keep = utf8_truncate_boundary(src, keep);
 	memcpy(dst + pos, src, keep);
-	dst[pos + keep] = '\0';
+	if (ckd_add(&end, pos, keep))
+		return;
+	dst[end] = '\0';
 }
 
 /*
@@ -224,11 +233,10 @@ utf8_bounded_copy(char *dst, const char *src, size_t dstsz)
 void
 compose_bar(struct openbar *app)
 {
-	char	     line[BAR_TEXT_MAX];
+	char	     line[BAR_TEXT_MAX] = {};
 	unsigned int i;
 
-	line[0] = '\0';
-	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {
+	if (app->conf.logo != nullptr && app->conf.logo[0] != '\0') {
 		bappend(line, sizeof(line), "| ");
 		bappend(line, sizeof(line), app->conf.logo);
 		bappend(line, sizeof(line), SEPARATOR);

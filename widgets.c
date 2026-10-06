@@ -59,6 +59,7 @@
 #include <fcntl.h>
 #include <ifaddrs.h>
 #include <machine/apmvar.h>
+#include <stdckdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -124,7 +125,7 @@ collect_hostname(struct openbar *app)
 static void
 collect_date(struct openbar *app)
 {
-	app->now = time(NULL);
+	app->now = time(nullptr);
 }
 
 /*
@@ -137,9 +138,9 @@ void
 collect_cpu_init(struct openbar *app)
 {
 	int    mib[2] = {CTL_HW, HW_CPUSPEED};
-	size_t len = sizeof(app->cpu_mhz);
+	auto   len = sizeof(app->cpu_mhz);
 
-	if (sysctl(mib, 2, &app->cpu_mhz, &len, NULL, 0) == -1) {
+	if (sysctl(mib, 2, &app->cpu_mhz, &len, nullptr, 0) == -1) {
 		app->cpu_have_freq = false;
 		return;
 	}
@@ -155,7 +156,7 @@ collect_cpu_init(struct openbar *app)
 static int
 cpu_sensor_find(struct openbar *app)
 {
-	struct sensordev sd;
+	struct sensordev sd = {};
 	int		 mib[3], dev;
 
 	if (app->cpu_sensor != 0)
@@ -164,10 +165,10 @@ cpu_sensor_find(struct openbar *app)
 	mib[0] = CTL_HW;
 	mib[1] = HW_SENSORS;
 	for (dev = 0; dev < SENSOR_DEV_MAX; dev++) {
-		size_t len = sizeof(sd);
+		auto len = sizeof(sd);
 
 		mib[2] = dev;
-		if (sysctl(mib, 3, &sd, &len, NULL, 0) == -1) {
+		if (sysctl(mib, 3, &sd, &len, nullptr, 0) == -1) {
 			if (errno == ENOENT)
 				break; /* end of device list */
 			continue;      /* ENXIO: hole in the list */
@@ -185,8 +186,8 @@ cpu_sensor_find(struct openbar *app)
 static void
 collect_cpu(struct openbar *app)
 {
-	struct sensor s;
-	size_t	      len = sizeof(s);
+	struct sensor s = {};
+	auto	      len = sizeof(s);
 	int	      dev, mib[5];
 
 	dev = cpu_sensor_find(app);
@@ -195,7 +196,7 @@ collect_cpu(struct openbar *app)
 	mib[2] = dev;
 	mib[3] = SENSOR_TEMP;
 	mib[4] = 0;
-	if (dev >= 0 && sysctl(mib, 5, &s, &len, NULL, 0) != -1 &&
+	if (dev >= 0 && sysctl(mib, 5, &s, &len, nullptr, 0) != -1 &&
 	    (s.flags & SENSOR_FINVALID) == 0) {
 		app->cpu_temp =
 		    (int)((s.value - MICROKELVIN_FREEZING) / 1'000'000);
@@ -208,21 +209,25 @@ collect_cpu(struct openbar *app)
 static void
 collect_mem(struct openbar *app)
 {
-	struct uvmexp uv;
+	struct uvmexp uv = {};
 	int	      mib[2] = {CTL_VM, VM_UVMEXP};
-	size_t	      len = sizeof(uv);
+	auto	      len = sizeof(uv);
 
-	if (sysctl(mib, 2, &uv, &len, NULL, 0) == -1) {
+	if (sysctl(mib, 2, &uv, &len, nullptr, 0) == -1) {
 		app->mem_valid = false;
 		return;
 	}
 	/*
 	 * Free physical memory in MiB.  free is a page count and
-	 * pagesize is in bytes, so wide arithmetic avoids any overflow
-	 * before the division.
+	 * pagesize is in bytes; the product is checked before the
+	 * division.
 	 */
-	app->mem_free_mb = (unsigned long long)uv.free *
-	    (unsigned long long)uv.pagesize / (1024ULL * 1024ULL);
+	if (ckd_mul(&app->mem_free_mb, (unsigned long long)uv.free,
+		(unsigned long long)uv.pagesize)) {
+		app->mem_valid = false;
+		return;
+	}
+	app->mem_free_mb /= 1024ULL * 1024ULL;
 	app->mem_valid = true;
 }
 
@@ -235,7 +240,7 @@ collect_load(struct openbar *app)
 static void
 collect_bat(struct openbar *app)
 {
-	struct apm_power_info pi;
+	struct apm_power_info pi = {};
 
 	app->bat_pct = -1;
 	if (app->apm_fd == -1)
@@ -258,7 +263,7 @@ static void
 collect_ifaddrs(struct openbar *app)
 {
 	struct ifaddrs *ifap, *ifa;
-	char		fallback_ip[ADDR4_STRLEN] = "";
+	char		fallback_ip[ADDR4_STRLEN] = {};
 	bool		have_ip = false;
 
 	app->vpn_up = false;
@@ -267,8 +272,8 @@ collect_ifaddrs(struct openbar *app)
 	if (getifaddrs(&ifap) == -1)
 		return;
 
-	for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
-		if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL)
+	for (ifa = ifap; ifa != nullptr; ifa = ifa->ifa_next) {
+		if (ifa->ifa_name == nullptr || ifa->ifa_addr == nullptr)
 			continue;
 
 		/*
@@ -285,8 +290,8 @@ collect_ifaddrs(struct openbar *app)
 			char buf[ADDR4_STRLEN];
 
 			if (inet_ntop(AF_INET, &sa->sin_addr, buf,
-				sizeof(buf)) != NULL) {
-				if (app->conf.interface != NULL &&
+				sizeof(buf)) != nullptr) {
+				if (app->conf.interface != nullptr &&
 				    strcmp(ifa->ifa_name,
 					app->conf.interface) == 0) {
 					strlcpy(app->int_ip4, buf,

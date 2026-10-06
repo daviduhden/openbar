@@ -30,7 +30,7 @@ test_valid_ip(void)
 	CHECK(valid_ip("1.2.3.4\r", AF_INET) == 0);
 	CHECK(valid_ip(" 1.2.3.4", AF_INET) == 0);
 	CHECK(valid_ip("", AF_INET) == 0);
-	CHECK(valid_ip(NULL, AF_INET) == 0);
+	CHECK(valid_ip(nullptr, AF_INET) == 0);
 	CHECK(valid_ip("203.0.113.7", AF_INET6) == 0);
 	CHECK(valid_ip("2001:db8::1", AF_INET) == 0);
 	CHECK(valid_ip("::1 extra", AF_INET6) == 0);
@@ -84,7 +84,7 @@ test_decode_validation(void)
 	/* truncated frame */
 	CHECK(ipc_decode(buf, sizeof(buf) - 1, &resp) == -1);
 	CHECK(ipc_decode(buf, 0, &resp) == -1);
-	CHECK(ipc_decode(NULL, sizeof(buf), &resp) == -1);
+	CHECK(ipc_decode(nullptr, sizeof(buf), &resp) == -1);
 
 	/* bad magic */
 	memcpy(buf, &bad, sizeof(buf));

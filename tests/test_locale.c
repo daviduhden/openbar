@@ -38,7 +38,7 @@ test_locale_env_ignored(void)
 
 	/* what the production main() runs: pin, then format */
 	CHECK(locale_init() == 0);
-	CHECK_STR(setlocale(LC_ALL, NULL), "C");
+	CHECK_STR(setlocale(LC_ALL, nullptr), "C");
 }
 
 static void
@@ -61,10 +61,9 @@ static void
 check_date(struct openbar *app, int year, int mon, int mday, int hour, int min,
     const char *expected)
 {
-	struct tm    tm;
+	struct tm    tm = {};
 	struct witem it;
 
-	memset(&tm, 0, sizeof(tm));
 	tm.tm_year = year - 1900;
 	tm.tm_mon = mon;
 	tm.tm_mday = mday;
