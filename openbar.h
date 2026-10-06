@@ -137,11 +137,11 @@ struct openbar {
 	struct conf conf;
 
 	/* network worker */
-	int		ipc_fd;
-	pid_t		ipc_pid;
-	enum ipc_state	ipc_state;
-	alignas(struct net_response) unsigned char ipc_rbuf
-	    [sizeof(struct net_response)];
+	int	       ipc_fd;
+	pid_t	       ipc_pid;
+	enum ipc_state ipc_state;
+	alignas(struct net_response) unsigned char ipc_rbuf[sizeof(
+	    struct net_response)];
 	size_t		ipc_rlen;
 	struct timespec ipc_deadline;
 

@@ -137,8 +137,8 @@ collect_date(struct openbar *app)
 void
 collect_cpu_init(struct openbar *app)
 {
-	int    mib[2] = {CTL_HW, HW_CPUSPEED};
-	auto   len = sizeof(app->cpu_mhz);
+	int  mib[2] = {CTL_HW, HW_CPUSPEED};
+	auto len = sizeof(app->cpu_mhz);
 
 	if (sysctl(mib, 2, &app->cpu_mhz, &len, nullptr, 0) == -1) {
 		app->cpu_have_freq = false;

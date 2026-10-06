@@ -171,7 +171,7 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
     long long max, int *out)
 {
 	const char *errstr;
-	auto        v = strtonum(value, min, max, &errstr);
+	auto	    v = strtonum(value, min, max, &errstr);
 
 	if (errstr != nullptr) {
 		warnx("%s:%zu: invalid value '%s' (expected %lld-%lld)", path,
