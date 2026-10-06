@@ -10,7 +10,10 @@ set -u
 
 bins=${*:-}
 
-[ -n "$bins" ] || { echo "usage: $0 test-bin ..." >&2; exit 1; }
+[ -n "$bins" ] || {
+	echo "usage: $0 test-bin ..." >&2
+	exit 1
+}
 
 fail() {
 	echo "FAIL ($env): $*" >&2
@@ -26,7 +29,7 @@ run_env() {
 	n=1
 	for b in $bins; do
 		if ! env -i "$@" TZ=UTC0 PATH="$PATH" "$b" \
-		    >"$tmp/$env.$n.out" 2>"$tmp/$env.$n.err"; then
+			>"$tmp/$env.$n.out" 2>"$tmp/$env.$n.err"; then
 			fail "$b exited non-zero"
 		fi
 		n=$((n + 1))
@@ -48,9 +51,12 @@ for spec in \
 	"gbk LANG=zh_CN.GBK" \
 	"latin1 LC_ALL=en_US.ISO8859-1" \
 	"numeric LC_NUMERIC=de_DE.UTF-8" \
-	"koi8 LANG=ru_RU.KOI8-R"
-do
+	"koi8 LANG=ru_RU.KOI8-R"; do
 	name=${spec%% *}
+	# The remainder is a whitespace-separated list of NAME=VALUE
+	# environment assignments; splitting it into positional
+	# parameters is intended.
+	# shellcheck disable=SC2086
 	set -- ${spec#* }
 	envnames="$envnames $name"
 	run_env "$name" "$@"
@@ -59,10 +65,10 @@ done
 n=1
 for b in $bins; do
 	for name in $envnames; do
-		cmp -s "$tmp/baseline.$n.out" "$tmp/$name.$n.out" || \
-		    fail "$b stdout changed under $name"
-		cmp -s "$tmp/baseline.$n.err" "$tmp/$name.$n.err" || \
-		    fail "$b stderr changed under $name"
+		cmp -s "$tmp/baseline.$n.out" "$tmp/$name.$n.out" ||
+			fail "$b stdout changed under $name"
+		cmp -s "$tmp/baseline.$n.err" "$tmp/$name.$n.err" ||
+			fail "$b stderr changed under $name"
 	done
 	n=$((n + 1))
 done

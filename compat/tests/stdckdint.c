@@ -86,11 +86,11 @@ next_slot(void)
 int
 main(void)
 {
-	size_t		z;
-	long long	s;
+	size_t		   z;
+	long long	   s;
 	unsigned long long q;
-	time_t		t;
-	_Bool		ov;
+	time_t		   t;
+	_Bool		   ov;
 
 	/* ---- size_t: the unsigned type used for allocation sizes ---- */
 	z = 0;
@@ -119,7 +119,8 @@ main(void)
 
 		s = 0;
 		ov = ckd_add(&s, ll_max, 0LL);
-		check(!ov && s == ll_max, "long long add max+0 does not overflow");
+		check(!ov && s == ll_max,
+		    "long long add max+0 does not overflow");
 
 		ov = ckd_add(&s, ll_max, 1LL);
 		check(ov, "long long add max+1 overflows");
@@ -152,8 +153,7 @@ main(void)
 		unsigned short h = 0;
 
 		ov = ckd_add(&h, 30000, 30000);
-		check(!ov && h == 60000,
-		    "unsigned short add 30000+30000 fits");
+		check(!ov && h == 60000, "unsigned short add 30000+30000 fits");
 
 		ov = ckd_add(&h, 40000, 40000);
 		check(ov, "unsigned short add 40000+40000 overflows");

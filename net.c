@@ -135,7 +135,7 @@ set_timeouts(int fd)
 static int
 http_fetch(int family, char *out, size_t outlen)
 {
-	struct addrinfo hints = {}, *res, *ai;
+	struct addrinfo	   hints = {}, *res, *ai;
 	struct tls_config *tls_cfg;
 	struct tls	  *ctx;
 	char		   buf[RESPONSE_MAX];
