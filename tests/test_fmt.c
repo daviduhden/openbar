@@ -139,10 +139,9 @@ test_fmt_date(void)
 {
 	struct openbar app;
 	struct witem   it;
-	struct tm      tm;
+	struct tm      tm = {};
 
 	fresh_app(&app);
-	memset(&tm, 0, sizeof(tm));
 	tm.tm_year = 120; /* 2020 */
 	tm.tm_mon = 0;
 	tm.tm_mday = 6;
@@ -207,7 +206,7 @@ test_compose(void)
 	app.conf.enabled[WIDGET_HOSTNAME] = false;
 	app.conf.enabled[WIDGET_MEM] = false;
 	free(app.conf.logo);
-	app.conf.logo = NULL;
+	app.conf.logo = nullptr;
 	compose_bar(&app);
 	CHECK_STR(app.bar_text, "");
 	CHECK(app.dirty);

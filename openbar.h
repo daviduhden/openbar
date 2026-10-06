@@ -66,9 +66,9 @@
 #define ADDR4_STRLEN 16 /* INET_ADDRSTRLEN */
 #define ADDR6_STRLEN 46 /* INET6_ADDRSTRLEN */
 
-enum color_slot { COLOR_FG, COLOR_BG, COLOR_URGENT, COLOR_NITEMS };
+enum color_slot : int { COLOR_FG, COLOR_BG, COLOR_URGENT, COLOR_NITEMS };
 
-enum widget {
+enum widget : int {
 	WIDGET_HOSTNAME,
 	WIDGET_DATE,
 	WIDGET_CPU,
@@ -127,7 +127,7 @@ struct net_response {
 	char	addr_v6[ADDR6_STRLEN];
 };
 
-enum ipc_state {
+enum ipc_state : int {
 	IPC_IDLE,     /* waiting for the next fetch deadline */
 	IPC_FETCHING, /* request sent, awaiting the response */
 	IPC_BROKEN    /* worker is gone; no more public addresses */
@@ -140,7 +140,8 @@ struct openbar {
 	int		ipc_fd;
 	pid_t		ipc_pid;
 	enum ipc_state	ipc_state;
-	unsigned char	ipc_rbuf[sizeof(struct net_response)];
+	alignas(struct net_response) unsigned char ipc_rbuf
+	    [sizeof(struct net_response)];
 	size_t		ipc_rlen;
 	struct timespec ipc_deadline;
 

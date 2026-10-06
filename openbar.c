@@ -52,7 +52,6 @@
  */
 
 #include <sys/socket.h>
-#include <sys/wait.h>
 
 #include <X11/Xatom.h>
 #include <X11/Xft/Xft.h>
@@ -63,6 +62,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <signal.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,17 +143,16 @@ quit_handler(int)
 static void
 setup_signals(void)
 {
-	struct sigaction sa;
+	struct sigaction sa = {};
 
-	memset(&sa, 0, sizeof(sa));
 	sigemptyset(&sa.sa_mask);
 	sa.sa_handler = SIG_IGN;
-	if (sigaction(SIGPIPE, &sa, NULL) == -1)
+	if (sigaction(SIGPIPE, &sa, nullptr) == -1)
 		err(1, "sigaction(SIGPIPE)");
 
 	sa.sa_handler = quit_handler;
-	if (sigaction(SIGTERM, &sa, NULL) == -1 ||
-	    sigaction(SIGINT, &sa, NULL) == -1)
+	if (sigaction(SIGTERM, &sa, nullptr) == -1 ||
+	    sigaction(SIGINT, &sa, nullptr) == -1)
 		err(1, "sigaction");
 
 	/*
@@ -162,7 +161,7 @@ setup_signals(void)
 	 * retained); worker loss is detected through the IPC socket.
 	 */
 	sa.sa_handler = SIG_IGN;
-	if (sigaction(SIGCHLD, &sa, NULL) == -1)
+	if (sigaction(SIGCHLD, &sa, nullptr) == -1)
 		err(1, "sigaction(SIGCHLD)");
 }
 
@@ -197,29 +196,37 @@ resolve_xauthority(void)
 {
 	const char *auth, *home;
 	char	    resolved[PATH_MAX];
+	char	   *path;
 
 	auth = getenv("XAUTHORITY");
-	if (auth != NULL && auth[0] != '\0') {
-		if (realpath(auth, resolved) == NULL)
-			return NULL;
-		return strdup(resolved);
+	if (auth != nullptr && auth[0] != '\0') {
+		if (realpath(auth, resolved) == nullptr)
+			return nullptr;
+		if ((path = strdup(resolved)) == nullptr)
+			err(1, "strdup");
+		return path;
 	}
 	home = getenv("HOME");
-	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
-		size_t len = strlen(home) + sizeof("/.Xauthority");
-		char  *candidate = malloc(len);
+	if (home != nullptr && home[0] != '\0' && strlen(home) < 1024) {
+		size_t len;
+		char  *candidate;
 
-		if (candidate == NULL)
+		if (ckd_add(&len, strlen(home), sizeof("/.Xauthority")))
+			err(1, "size overflow");
+		candidate = malloc(len);
+		if (candidate == nullptr)
 			err(1, "malloc");
 		snprintf(candidate, len, "%s/.Xauthority", home);
-		if (realpath(candidate, resolved) == NULL) {
+		if (realpath(candidate, resolved) == nullptr) {
 			free(candidate);
-			return NULL;
+			return nullptr;
 		}
 		free(candidate);
-		return strdup(resolved);
+		if ((path = strdup(resolved)) == nullptr)
+			err(1, "strdup");
+		return path;
 	}
-	return NULL;
+	return nullptr;
 }
 
 /* Unveil an existing path for reading; absent paths are fine. */
@@ -265,7 +272,7 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 		warn("unveil /tmp/.X11-unix");
 		return -1;
 	}
-	if (xauth_path != NULL && unveil_read(xauth_path) == -1)
+	if (xauth_path != nullptr && unveil_read(xauth_path) == -1)
 		return -1;
 	if (c->enabled[WIDGET_BAT] && unveil_read("/dev/apm") == -1)
 		return -1;
@@ -274,12 +281,16 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 			return -1;
 	}
 	home = getenv("HOME");
-	if (home != NULL && home[0] != '\0' && strlen(home) < 1024) {
+	if (home != nullptr && home[0] != '\0' && strlen(home) < 1024) {
 		for (i = 0; i < sizeof(user_dirs) / sizeof(user_dirs[0]); i++) {
-			size_t len = strlen(home) + strlen(user_dirs[i]) + 1;
-			char  *path = malloc(len);
+			size_t len;
+			char  *path;
 
-			if (path == NULL)
+			if (ckd_add(&len, strlen(home), strlen(user_dirs[i])) ||
+			    ckd_add(&len, len, 1))
+				err(1, "size overflow");
+			path = malloc(len);
+			if (path == nullptr)
 				err(1, "malloc");
 			snprintf(path, len, "%s%s", home, user_dirs[i]);
 			if (unveil_read(path) == -1) {
@@ -289,7 +300,7 @@ unveil_parent(const struct conf *c, const char *xauth_path)
 			free(path);
 		}
 	}
-	if (unveil(NULL, NULL) == -1) {
+	if (unveil(nullptr, nullptr) == -1) {
 		warn("unveil");
 		return -1;
 	}
@@ -377,7 +388,7 @@ window_create(struct xstate *x, const struct conf *c)
 	XSetWindowBackground(x->dpy, x->win, x->colors[COLOR_BG].pixel);
 
 	x->draw = XftDrawCreate(x->dpy, x->win, x->visual, x->cmap);
-	if (x->draw == NULL) {
+	if (x->draw == nullptr) {
 		warnx("cannot create Xft draw");
 		XDestroyWindow(x->dpy, x->win);
 		x->win = 0;
@@ -401,8 +412,8 @@ xstate_open(struct xstate *x, const struct conf *c)
 	unsigned int i;
 
 	memset(x, 0, sizeof(*x));
-	x->dpy = XOpenDisplay(NULL);
-	if (x->dpy == NULL) {
+	x->dpy = XOpenDisplay(nullptr);
+	if (x->dpy == nullptr) {
 		warnx("cannot open display");
 		return -1;
 	}
@@ -429,12 +440,12 @@ xstate_open(struct xstate *x, const struct conf *c)
 	}
 
 	x->font = XftFontOpenName(x->dpy, x->screen, c->fontname);
-	if (x->font == NULL) {
+	if (x->font == nullptr) {
 		warnx("cannot open font '%s'; falling back to '%s'",
 		    c->fontname, default_font);
 		x->font = XftFontOpenName(x->dpy, x->screen, default_font);
 	}
-	if (x->font == NULL) {
+	if (x->font == nullptr) {
 		warnx("no usable font");
 		goto fail;
 	}
@@ -452,15 +463,15 @@ xstate_close(struct xstate *x)
 {
 	unsigned int i;
 
-	if (x->dpy == NULL)
+	if (x->dpy == nullptr)
 		return;
-	if (x->draw != NULL) {
+	if (x->draw != nullptr) {
 		XftDrawDestroy(x->draw);
-		x->draw = NULL;
+		x->draw = nullptr;
 	}
-	if (x->font != NULL) {
+	if (x->font != nullptr) {
 		XftFontClose(x->dpy, x->font);
-		x->font = NULL;
+		x->font = nullptr;
 	}
 	for (i = 0; i < x->ncolors; i++)
 		XftColorFree(x->dpy, x->visual, x->cmap, &x->colors[i]);
@@ -470,7 +481,7 @@ xstate_close(struct xstate *x)
 		x->win = 0;
 	}
 	XCloseDisplay(x->dpy);
-	x->dpy = NULL;
+	x->dpy = nullptr;
 }
 
 /*
@@ -492,7 +503,7 @@ draw_line(struct openbar *app, struct xstate *x)
 	unsigned int i;
 	int	     nchunks = 0, total = 0, cx, cy;
 
-	if (app->conf.logo != NULL && app->conf.logo[0] != '\0') {
+	if (app->conf.logo != nullptr && app->conf.logo[0] != '\0') {
 		snprintf(texts[nchunks], sizeof(texts[nchunks]), "| %s",
 		    app->conf.logo);
 		chunks[nchunks].text = texts[nchunks];
@@ -629,15 +640,20 @@ next_timeout_ms(struct openbar *app)
 	for (i = 0; i < WIDGET_NITEMS; i++) {
 		if (!app->conf.enabled[i])
 			continue;
-		delta = (long long)(app->due[i].tv_sec - now.tv_sec) * 1000 +
-		    (app->due[i].tv_nsec - now.tv_nsec) / 1000000;
+		if (ckd_sub(&delta, app->due[i].tv_sec, now.tv_sec) ||
+		    ckd_mul(&delta, delta, 1000) ||
+		    ckd_add(&delta, delta,
+			(app->due[i].tv_nsec - now.tv_nsec) / 1000000))
+			continue; /* out of range: ignore this deadline */
 		if (delta < ms)
 			ms = delta;
 	}
 	if (app->ipc_state == IPC_FETCHING) {
-		delta =
-		    (long long)(app->ipc_deadline.tv_sec - now.tv_sec) * 1000 +
-		    (app->ipc_deadline.tv_nsec - now.tv_nsec) / 1000000;
+		if (ckd_sub(&delta, app->ipc_deadline.tv_sec, now.tv_sec) ||
+		    ckd_mul(&delta, delta, 1000) ||
+		    ckd_add(&delta, delta,
+			(app->ipc_deadline.tv_nsec - now.tv_nsec) / 1000000))
+			delta = ms;
 		if (delta < ms)
 			ms = delta;
 	}
@@ -748,16 +764,14 @@ apply_response(struct openbar *app)
 int
 main(int argc, char *argv[])
 {
-	struct openbar app;
-	struct xstate  x;
-	const char    *confpath = NULL;
-	char	      *resolved = NULL, *xauth = NULL;
+	struct openbar app = {};
+	struct xstate  x = {};
+	const char    *confpath = nullptr;
+	char	      *resolved = nullptr, *xauth = nullptr;
 	char	       pledgestr[128];
 	struct pollfd  pfds[2];
 	int	       opt, run_once = 0, xfd;
 
-	memset(&app, 0, sizeof(app));
-	memset(&x, 0, sizeof(x));
 	app.apm_fd = -1;
 	app.ipc_fd = -1;
 	app.ipc_pid = -1;
@@ -813,7 +827,7 @@ main(int argc, char *argv[])
 	if (unveil_parent(&app.conf, xauth) == -1)
 		goto fail;
 	free(xauth);
-	xauth = NULL;
+	xauth = nullptr;
 
 	/* hw.cpuspeed is not pledge-readable; sample it once now */
 	if (app.conf.enabled[WIDGET_CPU])
@@ -829,7 +843,7 @@ main(int argc, char *argv[])
 		      "display process remains unpledged");
 	} else {
 		build_pledge(pledgestr, sizeof(pledgestr), &app.conf);
-		if (pledge(pledgestr, NULL) == -1)
+		if (pledge(pledgestr, nullptr) == -1)
 			err(1, "pledge");
 	}
 
@@ -886,7 +900,7 @@ fail:
 	if (app.apm_fd != -1)
 		close(app.apm_fd);
 	free(xauth);
-	if (x.dpy != NULL)
+	if (x.dpy != nullptr)
 		xstate_close(&x);
 	conf_free(&app.conf);
 	return 1;

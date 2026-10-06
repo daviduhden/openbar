@@ -40,6 +40,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <stdckdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -65,6 +66,12 @@ static_assert(ADDR4_STRLEN >= INET_ADDRSTRLEN,
     "addr_v4 too small for inet_pton(3)/inet_ntop(3)");
 static_assert(ADDR6_STRLEN >= INET6_ADDRSTRLEN,
     "addr_v6 too small for inet_pton(3)/inet_ntop(3)");
+static_assert(
+    alignof(struct net_response) == 1, "net_response alignment changed");
+static_assert(
+    sizeof(enum net_status) == 1, "net_status must stay one byte wide");
+static_assert(
+    NET_STATUS_NITEMS <= UINT8_MAX, "net_status does not fit in uint8_t");
 
 /*
  * Read exactly n bytes (or until EOF).  Returns the number of bytes
@@ -78,7 +85,7 @@ read_full(int fd, void *buf, size_t n)
 	char  *p = buf;
 
 	while (left > 0) {
-		ssize_t r = read(fd, p, left);
+		auto r = read(fd, p, left);
 
 		if (r == -1) {
 			if (errno == EINTR)
@@ -87,10 +94,17 @@ read_full(int fd, void *buf, size_t n)
 		}
 		if (r == 0)
 			break;
-		left -= (size_t)r;
+		if (ckd_sub(&left, left, (size_t)r))
+			return -1; /* unreachable: read() never over-reports */
 		p += r;
 	}
-	return (ssize_t)(n - left);
+	{
+		size_t done;
+
+		if (ckd_sub(&done, n, left))
+			return -1; /* unreachable: left <= n */
+		return (ssize_t)done;
+	}
 }
 
 /* Write n bytes.  Returns n or -1. */
@@ -101,14 +115,15 @@ write_full(int fd, const void *buf, size_t n)
 	const char *p = buf;
 
 	while (left > 0) {
-		ssize_t r = write(fd, p, left);
+		auto r = write(fd, p, left);
 
 		if (r == -1) {
 			if (errno == EINTR)
 				continue;
 			return -1;
 		}
-		left -= (size_t)r;
+		if (ckd_sub(&left, left, (size_t)r))
+			return -1; /* unreachable: write() never over-reports */
 		p += r;
 	}
 	return (ssize_t)n;
@@ -120,7 +135,7 @@ valid_ip(const char *s, int family)
 {
 	unsigned char buf[sizeof(struct in6_addr)];
 
-	if (s == NULL || s[0] == '\0')
+	if (s == nullptr || s[0] == '\0')
 		return 0;
 	return inet_pton(family, s, buf) == 1;
 }
@@ -162,9 +177,9 @@ ipc_encode(struct net_response *resp, int status_v4, const char *addr_v4,
 	resp->magic = IPC_MAGIC;
 	resp->status_v4 = (uint8_t)status_v4;
 	resp->status_v6 = (uint8_t)status_v6;
-	if (status_v4 == NET_OK && addr_v4 != NULL)
+	if (status_v4 == NET_OK && addr_v4 != nullptr)
 		copybounded(resp->addr_v4, addr_v4, sizeof(resp->addr_v4));
-	if (status_v6 == NET_OK && addr_v6 != NULL)
+	if (status_v6 == NET_OK && addr_v6 != nullptr)
 		copybounded(resp->addr_v6, addr_v6, sizeof(resp->addr_v6));
 }
 
@@ -179,7 +194,7 @@ ipc_decode(const unsigned char *buf, size_t len, struct net_response *out)
 {
 	struct net_response r;
 
-	if (buf == NULL || len != sizeof(r))
+	if (buf == nullptr || len != sizeof(r))
 		return -1;
 	memcpy(&r, buf, sizeof(r));
 	if (r.magic != IPC_MAGIC)

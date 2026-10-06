@@ -26,10 +26,10 @@ write_conf(const char *content)
 		exit(1);
 	}
 	path = strdup(template);
-	if (path == NULL)
+	if (path == nullptr)
 		exit(1);
 	fp = fdopen(fd, "w");
-	if (fp == NULL)
+	if (fp == nullptr)
 		exit(1);
 	if (fputs(content, fp) == EOF) {
 		perror("fputs");
@@ -45,7 +45,7 @@ write_conf(const char *content)
 static void
 quiet(void)
 {
-	if (freopen("/dev/null", "w", stderr) == NULL) {
+	if (freopen("/dev/null", "w", stderr) == nullptr) {
 		perror("freopen");
 		exit(1);
 	}
@@ -57,8 +57,8 @@ test_defaults(void)
 	struct conf c;
 
 	conf_defaults(&c);
-	CHECK(c.logo == NULL);
-	CHECK(c.interface == NULL);
+	CHECK(c.logo == nullptr);
+	CHECK(c.interface == nullptr);
 	CHECK_STR(c.fontname, "sans-serif:pixelsize=14:bold");
 	CHECK_STR(c.colors[COLOR_FG], "#000000");
 	CHECK_STR(c.colors[COLOR_BG], "#CCCCCC");
@@ -242,7 +242,7 @@ test_line_too_long(void)
 		FILE *fp;
 
 		fp = fopen(path, "a");
-		if (fp == NULL)
+		if (fp == nullptr)
 			exit(1);
 		if (fputs(buf, fp) == EOF || fclose(fp) != 0)
 			exit(1);

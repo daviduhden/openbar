@@ -57,6 +57,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <signal.h>
+#include <stdckdint.h>
 #include <string.h>
 #include <tls.h>
 #include <unistd.h>
@@ -134,7 +135,7 @@ set_timeouts(int fd)
 static int
 http_fetch(int family, char *out, size_t outlen)
 {
-	struct addrinfo	   hints, *res, *ai;
+	struct addrinfo hints = {}, *res, *ai;
 	struct tls_config *tls_cfg;
 	struct tls	  *ctx;
 	char		   buf[RESPONSE_MAX];
@@ -144,14 +145,13 @@ http_fetch(int family, char *out, size_t outlen)
 	int		   sockfd, rc;
 	ssize_t		   n;
 
-	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
 	if (getaddrinfo(PUBLIC_HOST, PUBLIC_PORT, &hints, &res) != 0)
 		return NET_ERR_DNS;
 
 	sockfd = -1;
-	for (ai = res; ai != NULL; ai = ai->ai_next) {
+	for (ai = res; ai != nullptr; ai = ai->ai_next) {
 		sockfd = tcp_connect(ai);
 		if (sockfd == -1)
 			continue;
@@ -168,7 +168,7 @@ http_fetch(int family, char *out, size_t outlen)
 
 	tls_cfg = tls_config_new();
 	ctx = tls_client();
-	if (tls_cfg == NULL || ctx == NULL) {
+	if (tls_cfg == nullptr || ctx == nullptr) {
 		tls_config_free(tls_cfg);
 		tls_free(ctx);
 		close(sockfd);
@@ -198,7 +198,10 @@ http_fetch(int family, char *out, size_t outlen)
 			rc = NET_ERR_SYS;
 			goto done;
 		}
-		total += (size_t)n;
+		if (ckd_add(&total, total, (size_t)n)) {
+			rc = NET_ERR_SYS;
+			goto done;
+		}
 	}
 
 	total = 0;
@@ -218,7 +221,10 @@ http_fetch(int family, char *out, size_t outlen)
 		}
 		if (n == 0)
 			break;
-		total += (size_t)n;
+		if (ckd_add(&total, total, (size_t)n)) {
+			rc = NET_ERR_RECV;
+			goto done;
+		}
 	}
 	buf[total] = '\0';
 	rc = parse_response(buf, family, out, outlen);
@@ -244,7 +250,7 @@ parse_response(const char *buf, int family, char *out, size_t outlen)
 	    strncmp(buf, "HTTP/1.0 200", 12) != 0)
 		return NET_ERR_PARSE;
 	body = strstr(buf, "\r\n\r\n");
-	if (body == NULL)
+	if (body == nullptr)
 		return NET_ERR_PARSE;
 	body += 4;
 	end = body + strlen(body);
@@ -263,8 +269,8 @@ parse_response(const char *buf, int family, char *out, size_t outlen)
 void
 net_worker(int fd)
 {
-	char		    a4[ADDR4_STRLEN], a6[ADDR6_STRLEN];
-	struct net_response resp;
+	char		    a4[ADDR4_STRLEN] = {}, a6[ADDR6_STRLEN] = {};
+	struct net_response resp = {};
 	uint8_t		    cmd;
 	int		    s4, s6;
 
@@ -279,8 +285,8 @@ net_worker(int fd)
 			continue;
 		s4 = http_fetch(AF_INET, a4, sizeof(a4));
 		s6 = http_fetch(AF_INET6, a6, sizeof(a6));
-		ipc_encode(&resp, s4, s4 == NET_OK ? a4 : NULL, s6,
-		    s6 == NET_OK ? a6 : NULL);
+		ipc_encode(&resp, s4, s4 == NET_OK ? a4 : nullptr, s6,
+		    s6 == NET_OK ? a6 : nullptr);
 		if (write_full(fd, &resp, sizeof(resp)) !=
 		    (ssize_t)sizeof(resp))
 			_exit(0);
@@ -301,7 +307,7 @@ unveil_worker(void)
 		return -1;
 	if (unveil("/etc/ssl/cert.pem", "r") == -1)
 		return -1;
-	if (unveil(NULL, NULL) == -1)
+	if (unveil(nullptr, nullptr) == -1)
 		return -1;
 	return 0;
 }
@@ -332,22 +338,21 @@ net_worker_start(struct openbar *app)
 		return -1;
 	}
 	if (app->ipc_pid == 0) {
-		struct sigaction sa;
+		struct sigaction sa = {};
 
 		/* drop the parent's signal handlers so the worker can
 		 * be terminated normally */
-		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = SIG_DFL;
 		sigemptyset(&sa.sa_mask);
-		sigaction(SIGTERM, &sa, NULL);
-		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, nullptr);
+		sigaction(SIGINT, &sa, nullptr);
 
 		close(sv[1]);
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		if (unveil_worker() == -1)
 			_exit(1);
-		if (pledge("stdio rpath inet dns", NULL) == -1)
+		if (pledge("stdio rpath inet dns", nullptr) == -1)
 			err(1, "pledge: network worker");
 		net_worker(sv[0]);
 		_exit(0);

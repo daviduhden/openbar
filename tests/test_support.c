@@ -33,10 +33,10 @@ strtonum(const char *numstr, long long minval, long long maxval,
 		errmsg = "too large";
 		ll = maxval;
 	} else {
-		errmsg = NULL;
+		errmsg = nullptr;
 	}
 done:
-	if (errstrp != NULL)
+	if (errstrp != nullptr)
 		*errstrp = errmsg;
 	return ll;
 }

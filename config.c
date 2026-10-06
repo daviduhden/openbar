@@ -37,8 +37,8 @@
  */
 
 #include <err.h>
-#include <errno.h>
 #include <limits.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,7 +93,7 @@ xstrdup(const char *str)
 {
 	char *p;
 
-	if ((p = strdup(str)) == NULL)
+	if ((p = strdup(str)) == nullptr)
 		err(1, "strdup");
 	return p;
 }
@@ -154,14 +154,14 @@ strip_quotes(char *arg, const char **errmsg)
 
 	quote = *arg;
 	end = strchr(arg + 1, quote);
-	if (end == NULL) {
+	if (end == nullptr) {
 		*errmsg = "unterminated quote";
-		return NULL;
+		return nullptr;
 	}
 	*end = '\0';
 	if (*trim(end + 1) != '\0') {
 		*errmsg = "trailing characters after quoted string";
-		return NULL;
+		return nullptr;
 	}
 	return arg + 1;
 }
@@ -171,10 +171,9 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
     long long max, int *out)
 {
 	const char *errstr;
-	long long   v;
+	auto        v = strtonum(value, min, max, &errstr);
 
-	v = strtonum(value, min, max, &errstr);
-	if (errstr != NULL) {
+	if (errstr != nullptr) {
 		warnx("%s:%zu: invalid value '%s' (expected %lld-%lld)", path,
 		    lineno, value, min, max);
 		return -1;
@@ -186,21 +185,20 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
 static int
 parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 {
-	char	   *saveptr = NULL, *token;
+	char	   *saveptr = nullptr, *token;
 	const char *errstr;
 	int	    gaps[4], n = 0;
 
-	for (token = strtok_r(arg, " \t", &saveptr); token != NULL;
-	    token = strtok_r(NULL, " \t", &saveptr)) {
-		long long v;
+	for (token = strtok_r(arg, " \t", &saveptr); token != nullptr;
+	    token = strtok_r(nullptr, " \t", &saveptr)) {
+		auto v = strtonum(token, 0, INT_MAX, &errstr);
 
 		if (n == 4) {
 			warnx("%s:%zu: gap takes exactly four values", path,
 			    lineno);
 			return -1;
 		}
-		v = strtonum(token, 0, INT_MAX, &errstr);
-		if (errstr != NULL) {
+		if (errstr != nullptr) {
 			warnx("%s:%zu: invalid gap value '%s'", path, lineno,
 			    token);
 			return -1;
@@ -223,7 +221,7 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 	unsigned int i;
 
 	space = strpbrk(arg, " \t");
-	if (space == NULL) {
+	if (space == nullptr) {
 		warnx(
 		    "%s:%zu: color requires a slot and a value", path, lineno);
 		return -1;
@@ -231,7 +229,7 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 	*space = '\0';
 	value = trim(space + 1);
 	unquoted = strip_quotes(value, &errmsg);
-	if (unquoted == NULL) {
+	if (unquoted == nullptr) {
 		warnx("%s:%zu: %s", path, lineno, errmsg);
 		return -1;
 	}
@@ -311,7 +309,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 		return 0;
 
 	arg = strpbrk(kw, " \t");
-	if (arg != NULL) {
+	if (arg != nullptr) {
 		*arg++ = '\0';
 		arg = trim(arg);
 	}
@@ -319,7 +317,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 	if (strcmp(kw, "show") == 0 || strcmp(kw, "hide") == 0) {
 		int w;
 
-		if (arg == NULL || *arg == '\0') {
+		if (arg == nullptr || *arg == '\0') {
 			warnx("%s:%zu: %s requires a widget name", path, lineno,
 			    kw);
 			return -1;
@@ -332,7 +330,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 		return 0;
 	}
 
-	if (arg == NULL || *arg == '\0') {
+	if (arg == nullptr || *arg == '\0') {
 		warnx("%s:%zu: missing argument for '%s'", path, lineno, kw);
 		return -1;
 	}
@@ -346,7 +344,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 		return parse_color(path, lineno, arg, c);
 	if (strcmp(kw, "logo") == 0) {
 		value = strip_quotes(arg, &errmsg);
-		if (value == NULL) {
+		if (value == nullptr) {
 			warnx("%s:%zu: %s", path, lineno, errmsg);
 			return -1;
 		}
@@ -356,7 +354,7 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 		return parse_interface(path, lineno, arg, c);
 	if (strcmp(kw, "fontname") == 0) {
 		value = strip_quotes(arg, &errmsg);
-		if (value == NULL) {
+		if (value == nullptr) {
 			warnx("%s:%zu: %s", path, lineno, errmsg);
 			return -1;
 		}
@@ -403,14 +401,14 @@ conf_free(struct conf *c)
 	unsigned int i;
 
 	free(c->logo);
-	c->logo = NULL;
+	c->logo = nullptr;
 	free(c->interface);
-	c->interface = NULL;
+	c->interface = nullptr;
 	free(c->fontname);
-	c->fontname = NULL;
+	c->fontname = nullptr;
 	for (i = 0; i < COLOR_NITEMS; i++) {
 		free(c->colors[i]);
-		c->colors[i] = NULL;
+		c->colors[i] = nullptr;
 	}
 }
 
@@ -424,15 +422,15 @@ conf_free(struct conf *c)
 int
 conf_load(const char *path, struct conf *c)
 {
-	FILE  *fp = NULL;
-	char  *line = NULL;
+	FILE  *fp = nullptr;
+	char  *line = nullptr;
 	size_t cap = 0, lineno = 0;
 	int    rc = -1;
 
 	conf_defaults(c);
 
 	fp = fopen(path, "r");
-	if (fp == NULL) {
+	if (fp == nullptr) {
 		warn("%s", path);
 		goto out;
 	}
@@ -451,7 +449,7 @@ conf_load(const char *path, struct conf *c)
 		warn("%s", path);
 		goto out;
 	}
-	if (c->logo == NULL) {
+	if (c->logo == nullptr) {
 		warnx("%s: no 'logo' directive found", path);
 		goto out;
 	}
@@ -459,7 +457,7 @@ conf_load(const char *path, struct conf *c)
 	rc = 0;
 out:
 	free(line);
-	if (fp != NULL)
+	if (fp != nullptr)
 		fclose(fp);
 	if (rc == -1)
 		conf_free(c);
@@ -478,15 +476,18 @@ conf_resolve_path(const char *override_path)
 {
 	const char *home;
 
-	if (override_path != NULL)
+	if (override_path != nullptr)
 		return xstrdup(override_path);
 
 	home = getenv("HOME");
-	if (home != NULL && home[0] != '\0' && strlen(home) < HOME_MAX) {
-		size_t len = strlen(home) + sizeof("/.openbarrc");
-		char  *p = malloc(len);
+	if (home != nullptr && home[0] != '\0' && strlen(home) < HOME_MAX) {
+		size_t len;
+		char  *p;
 
-		if (p == NULL)
+		if (ckd_add(&len, strlen(home), sizeof("/.openbarrc")))
+			err(1, "size overflow");
+		p = malloc(len);
+		if (p == nullptr)
 			err(1, "malloc");
 		snprintf(p, len, "%s/.openbarrc", home);
 		if (access(p, R_OK) == 0)

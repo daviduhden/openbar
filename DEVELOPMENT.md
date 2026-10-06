@@ -25,6 +25,24 @@ compiles and runs.  The OpenBSD units are verified against the real OpenBSD
 and Xenocara headers on the target, but their logic is exercised indirectly
 through the portable units' tests where possible.
 
+## C23 usage
+
+The project is built and maintained as ISO C23 (`-std=c23`) and uses the
+following C23 features where they apply:
+
+- native `bool`/`true`/`false` (no `<stdbool.h>`);
+- `nullptr` for every null pointer constant;
+- `static_assert` (including `alignof`/`sizeof` and IPC layout invariants);
+- standard attributes `[[nodiscard]]` and `[[noreturn]]`;
+- fixed underlying types on enums (`enum net_status : uint8_t`, and the
+  internal enums pinned to `int`);
+- `alignas`/`alignof` to state buffer alignment;
+- `auto` for local declarations whose type is fixed by the initializer;
+- `typeof`/`typeof_unqual` in the test harness macros;
+- empty initializers (`= {}`) for zero-initialised locals;
+- `<stdckdint.h>` (`ckd_add`/`ckd_sub`/`ckd_mul`) for size arithmetic;
+- digit separators in numeric literals.
+
 ## Locale policy
 
 `openbar` follows the OpenBSD base-system approach to locales: one interface
@@ -65,6 +83,32 @@ names, legacy encodings) can ever affect it.
 There is no other mutable global state; the only file-scope variables are
 two `volatile sig_atomic_t` signal flags in `openbar.c`, written exclusively
 by async-signal-safe handlers and read in the main loop.
+
+## Ownership and lifetime
+
+The dynamic state is small and its ownership rules are explicit:
+
+- `struct conf` owns every `char *` it exposes (`logo`, `interface`,
+  `fontname`, `colors[]`).  `conf_defaults()` allocates them, `conf_load()`
+  replaces them (last directive wins) and always leaves the structure either
+  fully valid or freed, and `conf_free()` releases them and is idempotent
+  (it sets each pointer to `nullptr`).  No other object borrows these strings
+  beyond the call in which they are used.
+- The configuration path from `conf_resolve_path()` and the X authority path
+  from `resolve_xauthority()` are owned by the caller; `main()` frees each
+  exactly once, on every exit path.
+- `struct openbar` is a stack object owned by `main()`.  All of its buffers
+  are fixed-size inline arrays, so there are no owned strings; the only
+  owned resources are the two descriptors (`ipc_fd`, `apm_fd`), closed on
+  every exit path, including partial initialisation.
+- The network worker is a forked child rather than an object with an owner:
+  the parent holds `ipc_fd` and closes it to signal the worker, which owns
+  `sv[0]` and exits on EOF.  No dynamic memory is shared across processes;
+  the IPC frame is fixed-size, copied, and revalidated on receipt.
+- `struct xstate` owns the X11 display, window, drawable, font and colours.
+  `xstate_close()` is the single destructor and tolerates a partially
+  initialised object, so it is safe to call from the error path of
+  `xstate_open()`.
 
 ## Lifecycle
 
@@ -204,5 +248,4 @@ clang --analyze ...
 ## Style
 
 OpenBSD KNF (`style(9)`), tabs for indentation, 80 columns, BSD function
-declarations, no comments that merely restate code.  A matching
-`.clang-format` is included.
+declarations, no comments that merely restate code.
