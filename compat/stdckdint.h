@@ -58,6 +58,7 @@
 #ifndef OPENBAR_COMPAT_STDCKDINT_H
 #define OPENBAR_COMPAT_STDCKDINT_H
 
+// clang-format off
 #ifndef OPENBAR_STDCKDINT_FORCE_FALLBACK
 #if defined(__has_include_next)
 #if __has_include_next(<stdckdint.h>)
@@ -74,6 +75,7 @@
 #endif
 #endif
 #endif /* !OPENBAR_STDCKDINT_FORCE_FALLBACK */
+// clang-format on
 
 /*
  * A conforming C23 <stdckdint.h> defines __STDC_VERSION_STDCKDINT_H__

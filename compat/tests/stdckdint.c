@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+// clang-format off
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -50,6 +51,7 @@
 #include <time.h>
 
 #include <stdckdint.h>
+// clang-format on
 
 static int failures;
 
