@@ -13,21 +13,23 @@ interface itself.
 | File | Purpose |
 | --- | --- |
 | [stdckdint.h](stdckdint.h) | `<stdckdint.h>` shim. Uses the real header when one is reachable, otherwise provides `ckd_add`/`ckd_sub`/`ckd_mul` with the compiler's overflow builtins. |
-| [tests/](tests/) | Self-test for the `<stdckdint.h>` fallback. |
+| [tests/](tests/) | Conformance, differential and compile-fail tests for the `<stdckdint.h>` fallback. |
 
 ## Tests
 
 The self-test in [tests/](tests/) forces the fallback with
 `OPENBAR_STDCKDINT_FORCE_FALLBACK`, so it is covered even on a host
-whose libc already ships a real `<stdckdint.h>`.  It exercises the C23
-contract: representability is judged against the result type, operands
-are not converted to a common type first, and each argument is
-evaluated exactly once.
+whose libc already ships a real `<stdckdint.h>`.  It checks both the
+overflow indication and the stored value against an independent
+`__int128`-based oracle over a boundary grid for every standard integer
+type combination openbar uses, and separately checks that each argument
+is evaluated exactly once.
 
 Run it from the repository root:
 
 ```
 sh compat/tests/run.sh
+FORCE=OPENBAR_STDCKDINT_FORCE_FALLBACK sh compat/tests/stdckdint-compile-fail.sh
 ```
 
-`make test` runs it first, before the portable-unit suites.
+`make test` runs both first, before the portable-unit suites.

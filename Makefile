@@ -95,6 +95,8 @@ ${TEST_BINS}: ${TEST_OBJS} openbar.h tests/test.h
 
 test: ${TEST_BINS} test-locale
 	@CC="${CC}" CFLAGS="${CFLAGS}" sh compat/tests/run.sh
+	@CC="${CC}" CFLAGS="${CFLAGS}" FORCE=OPENBAR_STDCKDINT_FORCE_FALLBACK \
+	    sh compat/tests/stdckdint-compile-fail.sh
 	@for t in ${TEST_BINS}; do echo "==> $$t"; ./$$t || exit 1; done
 
 # Run the suite under a matrix of locale environments (English and

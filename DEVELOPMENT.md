@@ -45,12 +45,13 @@ following C23 features where they apply:
 - `<stdckdint.h>` (`ckd_add`/`ckd_sub`/`ckd_mul`) for size arithmetic;
 - digit separators in numeric literals.
 
-The OpenBSD base clang does not ship `<stdckdint.h>` yet, so `compat/`
-holds an embedded shim: it is placed on the include path (`-Icompat`),
-includes the real header with `include_next` when one is reachable, and
-otherwise defines the three macros in terms of the compiler's
-overflow-checked builtins (which is exactly what the standard header
-expands to).  The checked-arithmetic API is therefore always present.
+The header belongs to the C library, and OpenBSD's libc does not provide it
+yet.  The clang and GCC resource headers that ship `<stdckdint.h>` are not a
+replacement for it, so `compat/` holds an embedded shim: it is placed on the
+include path (`-Icompat`), includes a real header with `include_next` when one
+is reachable after `compat/`, and otherwise defines the three macros in terms
+of the compiler's overflow-checked builtins (which is exactly what a standard
+header expands to).  The checked-arithmetic API is therefore always present.
 
 ## Locale policy
 
