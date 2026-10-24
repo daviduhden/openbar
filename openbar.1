@@ -1,4 +1,4 @@
-.Dd $Mdocdate: September 7 2026 $
+.Dd $Mdocdate: October 24 2026 $
 .Dt OPENBAR 1
 .Os
 .Sh NAME
@@ -31,6 +31,8 @@ Run one update cycle and exit.
 Use the configuration file at
 .Ar path
 instead of the default.
+The file must exist and be readable; if the option is repeated, the
+last one wins.
 .It Fl h
 Print a usage message and exit.
 .El
@@ -40,7 +42,7 @@ Configuration is loaded from, in order:
 .It
 the file passed with
 .Fl c
-.Pq which must exist
+.Pq which must exist and be readable
 .It
 .Pa ~/.openbarrc
 if it exists and is readable
@@ -58,8 +60,8 @@ runs as one or two processes on
 .Bl -tag -width Ds
 .It Main process
 Reads configuration, manages the X11 window, and queries kernel
-interfaces for CPU, memory, load, battery, host name and network
-interface statistics.
+interfaces for CPU, memory, load, battery, host name, and network
+interface addresses and flags.
 .It Network worker
 When public network information is enabled, a child process is forked
 before sandboxing.
@@ -77,14 +79,14 @@ and reports them to the main process through a bounded
 .Xr socketpair 2
 protocol.
 The worker has no access to X11, the configuration file, battery or
-sensor devices, or any other parent resource.
+sensor devices, or the parent's X11 and APM descriptors.
 .El
 .Sh WIDGETS
 The following widgets can be enabled with
 .Ic show :
 .Bl -tag -width Ds -compact
 .It hostname
-System host name.
+System host name, refreshed every sixty seconds.
 .It date
 Current date and time, updated at minute boundaries.
 .It cpu
@@ -97,28 +99,38 @@ once at startup, before
 because that interface is not pledge-readable; the temperature
 .Va ( hw.sensors )
 is refreshed every five seconds.
-When no CPU temperature sensor exists, an
+When CPU temperature is unavailable (no sensor or a read failure), an
 .Sq x
 is shown instead.
 .It mem
-Free physical memory in MB, refreshed every two seconds.
+Free physical memory in MiB, refreshed every two seconds.
 .It load
 1-minute load average, refreshed every two seconds.
 .It bat
 Battery charge percentage, refreshed every thirty seconds.
 The segment switches to the urgent colour when the charge is at or
 below 15%.
-.It net
-Public IPv4, public IPv6 and the private IPv4 address of the
-configured interface.
-The public addresses are refreshed at most every five minutes; the
-private address every ten seconds.
 .It vpn
 WireGuard status, refreshed every ten seconds.
 A tunnel counts as connected when a
 .Sy wg*
 interface is up, running and has an assigned address.
+.It net
+Public IPv4, public IPv6 and the IPv4 address of the preferred
+interface, or of the first usable non-loopback interface.
+The public addresses are refreshed at most every five minutes; the
+interface address every ten seconds.
 .El
+.Pp
+Widgets render in the order listed above.
+.Pp
+Unavailable metrics are shown as
+.Dq N/A ;
+CPU temperature uses
+.Sq x ,
+and VPN reports
+.Dq No VPN
+when no tunnel is up.
 .Pp
 All widgets are disabled by default.
 .Sh LOCALE AND ENCODING
@@ -131,8 +143,9 @@ translation infrastructure.
 UTF-8 is the only supported character encoding.
 All text drawn by
 .Nm
-is UTF-8, and configuration values such as the logo are treated as
-UTF-8, so user data may contain arbitrary Unicode.
+is treated as UTF-8, and configuration values such as the logo are treated
+as UTF-8, so user data may contain arbitrary Unicode; input values are not
+validated.
 Legacy encodings such as ISO-8859-1, ISO-8859-15, Windows-1252,
 Shift-JIS, EUC-JP or KOI8-R are not supported.
 .Pp
@@ -160,6 +173,8 @@ Per-user configuration.
 .It Pa /etc/openbarrc
 System-wide configuration.
 .El
+.Sh EXIT STATUS
+.Ex -std
 .Sh SECURITY
 .Ss Sandboxing
 Both processes use
@@ -168,7 +183,8 @@ and
 .Xr unveil 2
 on
 .Ox
-to limit permitted system calls and filesystem visibility.
+to limit permitted system calls and filesystem visibility, with the
+battery exception described below.
 .Ss Main process
 Filesystem visibility is locked to:
 .Bl -bullet -compact
@@ -182,7 +198,7 @@ or
 .Pq read-only, when the file exists
 .It
 .Pa /dev/apm
-.Pq read-only, only if the battery widget is enabled and the node exists
+.Pq read-only, only if the battery widget is enabled and the node can be opened
 .It
 the fontconfig directories
 .Pa /etc/fonts ,
@@ -219,8 +235,8 @@ No pledge promise permits
 .Dv APM_IOC_GETPOWER .
 When the battery widget is enabled and
 .Pa /dev/apm
-exists, the display process therefore remains unpledged and prints a
-warning; its unveil policy is still locked.
+can be opened, the display process therefore remains unpledged and
+prints a warning; its unveil policy is still locked.
 .Ss Network worker
 The worker runs under
 .Dq stdio rpath inet dns
@@ -251,8 +267,10 @@ structure over
 the parent sends a one-byte fetch command, and the child responds
 with a bounded 65-byte frame containing a magic byte, per-family
 status codes and the address strings.
-The parent validates the magic byte, the status codes and both
-addresses with
+The parent validates the magic byte, the status codes and each
+address whose status is
+.Dv NET_OK
+with
 .Xr inet_pton 3
 before display.
 .Ss Network behaviour
@@ -261,15 +279,15 @@ service, so an on-path attacker cannot substitute another address
 without a valid certificate.
 The response is bounded and must be exactly one syntactically valid
 address of the requested family; anything else is rejected.
-The endpoint is rate-limited to one request per five minutes.
+The client rate-limits requests to one per five minutes.
 .Pp
-A DNS, connection or TLS failure shows
+A DNS, connection or TLS failure reported by the worker shows
 .Dq N/A
 and is retried at the next interval; the bar keeps running.
-If the worker fails permanently it is not restarted (restarting would
-require the
+A worker that stalls past the 30-second deadline or dies is not
+restarted (restarting would require the
 .Dq proc
-promise in the display process) and public addresses remain
+promise in the display process), and public addresses remain
 .Dq N/A
 until the bar is restarted.
 .Ss Limitations

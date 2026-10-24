@@ -18,20 +18,24 @@ cwm so that the bar blends in as if it were part of the window manager.
 - Load average
 - Battery status (with urgent colour at or below 15%)
 - Public IPv4 and IPv6 addresses (HTTPS)
-- Private IPv4 address
+- Interface IPv4 address (configured or automatic)
 - WireGuard VPN connection status
 
-If the CPU has no sensors or is not supported, an "x" is displayed next to the
-CPU speed, which is common in VMs or older machines.
+If the CPU has no sensors, the temperature cannot be read, or the CPU is not
+supported, an "x" is displayed next to the CPU speed, which is common in VMs
+or older machines.
 
 ## Configuration
 
-`openbar` uses a cwm-style keyword configuration format.  Lines starting with
-`#` are comments; strings with spaces must be quoted.
+`openbar` uses a cwm-style keyword configuration format.  Lines whose first
+non-space character is `#` are comments; there are no inline comments.  The
+values of `logo`, `fontname`, and `color` extend to the end of the line and
+may contain spaces; quotes are optional.  Other directives take unquoted
+arguments.
 
 Configuration is loaded from, in order:
 
-1. A custom path provided with `-c` (which must exist).
+1. A custom path provided with `-c` (which must exist and be readable).
 2. `~/.openbarrc` if it exists and is readable.
 3. The system-wide configuration file `/etc/openbarrc`.
 
@@ -42,7 +46,7 @@ Example `~/.openbarrc`:
 barheight 24
 gap 0 0 0 0
 
-# Colours (Xft colour names or #RRGGBB)
+# Colours (Xft colour names or #RRGGBB; invalid values fall back)
 color barbg "#CCCCCC"
 color barfg "#000000"
 color urgent "#FC8814"
@@ -53,7 +57,7 @@ fontname "sans-serif:pixelsize=14:bold"
 # Logo text (required)
 logo OpenBar
 
-# Network interface for private IP
+# Preferred network interface for the interface IPv4 address
 interface iwm0
 
 # Widget toggles (all widgets are hidden by default)
@@ -62,13 +66,13 @@ show date
 show cpu
 show mem
 show load
-show net
 show vpn
+show net
 hide bat
 ```
 
-Available widgets: `hostname`, `date`, `cpu`, `mem`, `load`, `bat`, `net`,
-`vpn`.
+Available widgets: `hostname`, `date`, `cpu`, `mem`, `load`, `bat`, `vpn`,
+`net`.  They render in that order.
 
 See [openbarrc(5)](openbarrc.5) for the complete manual.
 
@@ -91,9 +95,10 @@ contains no translation infrastructure: there is no gettext/NLS support, no
 message catalogs, and no translated behaviour of any kind.
 
 UTF-8 is the only supported character encoding.  All text drawn on the bar is
-UTF-8, and configuration values such as the logo are treated as UTF-8, so
-user data may contain arbitrary Unicode.  Legacy encodings (ISO-8859-1,
-ISO-8859-15, Windows-1252, Shift-JIS, EUC-JP, KOI8-R, ...) are not supported.
+treated as UTF-8, and configuration values such as the logo are treated as
+UTF-8, so user data may contain arbitrary Unicode; input values are not
+validated.  Legacy encodings (ISO-8859-1, ISO-8859-15, Windows-1252,
+Shift-JIS, EUC-JP, KOI8-R, ...) are not supported.
 
 The supported locale is `en_US.UTF-8`.  `openbar` follows the OpenBSD
 base-system approach to locales: it never reads `LANG`, `LANGUAGE`,
@@ -126,12 +131,13 @@ are fetched over **HTTPS** with [libtls](https://man.openbsd.org/tls_init.3),
 so an on-path attacker cannot substitute another address without a valid
 certificate; responses are bounded and validated with `inet_pton(3)` before
 display, and requests are rate-limited to one per five minutes.  Network
-failures show `N/A` and never block the bar; if the worker dies, public
-addresses remain `N/A` until the bar is restarted.
+failures show `N/A` and never block the bar; if the worker stalls or dies,
+public addresses remain `N/A` until the bar is restarted.
 
 One documented limitation: no pledge promise permits `APM_IOC_GETPOWER`, so
-with the battery widget enabled the display process stays unpledged (its
-unveil policy is still locked) and prints a warning.
+when the battery widget is enabled and `/dev/apm` can be opened, the display
+process stays unpledged (its unveil policy is still locked) and prints a
+warning.
 
 See [openbar(1)](openbar.1) for the details.
 
@@ -150,9 +156,9 @@ For `cwm`, leave a gap at the top of the screen for the bar in your `.cwmrc`:
 gap 24 0 0 0
 ```
 
-The bar window is not managed by the window manager, so it stays exactly at
-the configured `gap`; the cwm gap only keeps maximized windows from covering
-it.
+The bar window is not managed by the window manager, so it stays at the
+configured top, left, and right position; the cwm gap only keeps maximized
+windows from covering it.
 
 ## Building
 
@@ -175,8 +181,8 @@ make test
 
 `make test` also runs the suite under a matrix of locale environments
 (`en_US.UTF-8`, `de_DE.UTF-8`, `es_ES.UTF-8`, `fr_FR.UTF-8` messages, `C`,
-`POSIX`, legacy encodings) and requires byte-identical output everywhere.
-That matrix can be run on its own with `make test-locale`.
+`POSIX`, legacy encodings) and requires byte-identical stdout and stderr
+everywhere.  That matrix can be run on its own with `make test-locale`.
 
 ## Installing
 

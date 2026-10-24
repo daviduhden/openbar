@@ -114,7 +114,7 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 		break;
 	case WIDGET_MEM:
 		if (app->mem_valid)
-			snprintf(out->text, sizeof(out->text), "Mem: %llu MB",
+			snprintf(out->text, sizeof(out->text), "Mem: %llu MiB",
 			    app->mem_free_mb);
 		else
 			snprintf(out->text, sizeof(out->text), "Mem: N/A");
@@ -153,7 +153,8 @@ fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 /*
  * Largest prefix of src[0..keep) that ends on a UTF-8 character
  * boundary: a truncation that would split a multibyte sequence drops
- * the partial sequence entirely, so the result is always valid UTF-8.
+ * the partial sequence entirely.  Input bytes are otherwise not
+ * validated.
  */
 static size_t
 utf8_truncate_boundary(const char *src, size_t keep)
@@ -188,7 +189,7 @@ utf8_truncate_boundary(const char *src, size_t keep)
 
 /*
  * Append src to dst, truncating at the buffer end without splitting a
- * UTF-8 sequence, so the rendered line is always valid UTF-8.
+ * UTF-8 sequence.  Input bytes are not otherwise validated.
  */
 static void
 bappend(char *dst, size_t dstsz, const char *src)

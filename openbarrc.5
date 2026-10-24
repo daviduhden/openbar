@@ -1,4 +1,4 @@
-.Dd $Mdocdate: September 7 2026 $
+.Dd $Mdocdate: October 24 2026 $
 .Dt OPENBARRC 5
 .Os
 .Sh NAME
@@ -12,26 +12,43 @@ configuration file.
 The configuration syntax follows the keyword style of
 .Xr cwm 1 ,
 with directives separated by whitespace from their arguments.
-Comment lines start with a hash mark
-.Pq Sq # .
-Arguments containing whitespace should be surrounded by double
+A hash mark
+.Pq Sq #
+starts a comment only at the beginning of a line, after optional
+whitespace; there are no inline comments.
+The values of
+.Ic logo
+and
+.Ic fontname ,
+and the colour name in
+.Ic color ,
+extend to the end of the line and may contain spaces without quotes.
+A single matching pair of double
 .Pq \&"
 or single
 .Pq '
-quotes; a quoted argument must not be followed by other characters.
+quotes around the whole value is optional and preserves leading or
+trailing whitespace; there is no escape syntax, and a quoted value
+must not be followed by other characters.
+Other directives take unquoted arguments; quoting is not stripped
+from them.
 .Pp
 The file is UTF-8 encoded and text values such as
 .Ic logo
 may contain arbitrary Unicode characters.
+The parser does not validate UTF-8; invalid byte sequences are passed
+through to Xft.
 Keyword and widget names, diagnostics and all other interface text are
 U.S. English only; locale environment variables have no effect on the
 syntax.
+Colour names are limited to 63 bytes.
 .Pp
 The following options are accepted:
 .Bl -tag -width Ds
 .It Ic barheight Ar pixels
 Set the height of the status bar in pixels, between 12 and 60.
 The default is 24.
+A value larger than the screen height is clamped at runtime.
 .It Ic color barbg Ar color
 Set the background colour of the bar.
 The default is
@@ -60,22 +77,31 @@ The default is
 .Dq sans-serif:pixelsize=14:bold
 .Pq the same default font as cwm .
 .It Ic gap Ar top bottom left right
-Define a gap in pixels at each edge of the screen.
+Define gaps in pixels for the four screen edges.
 Exactly four non-negative values are required.
-The bar window, which is not managed by the window manager, is placed
-at this gap so that it does not overlap other screen-edge elements.
+The top, left, and right values position the top-edge bar window,
+which is not managed by the window manager.
+The bottom value is accepted for cwm-style symmetry and currently does
+not affect the bar, which is anchored to the top edge.
 The default is
 .Dq 0 0 0 0 .
+Left and right gaps that leave no usable width (their sum is at least
+the screen width) are fatal.
 .It Ic interface Ar name
-Set the preferred network interface name used to read the private
+Set the preferred network interface name used to read the interface
 IPv4 address.
-If the interface does not exist or has no IPv4 address, the first
-usable non-loopback interface is used instead.
-The name must be at most 15 characters and may contain letters,
-digits, underscore, dash and dot.
+If the interface does not exist, is down, or has no IPv4 address, the
+first usable non-loopback interface is used instead.
+The selected address is not range-checked, so an interface can supply a
+public IPv4 address here.
+The name must be at most 15 bytes, must begin with a letter or an
+underscore, and may otherwise contain letters, digits, underscore,
+dash and dot.
 .It Ic logo Ar text
-Set the text displayed as the bar logo, at most 127 characters.
+Set the text displayed as the bar logo, at most 127 bytes.
 This field is required.
+The limit counts bytes, so multibyte UTF-8 characters consume more
+than one byte.
 .It Ic show Ar widget
 Enable the given status widget.
 .It Ic hide Ar widget
@@ -94,22 +120,34 @@ Current date and time.
 .It cpu
 CPU clock speed and temperature.
 .It mem
-Free physical memory in MB.
+Free physical memory in MiB.
 .It load
 1-minute load average.
 .It bat
 Battery charge percentage.
-.It net
-Public IPv4, IPv6 and private IPv4 addresses.
 .It vpn
 WireGuard VPN status.
+.It net
+Public IPv4, IPv6 and interface IPv4 addresses.
 .El
+.Pp
+Widgets render in the order listed above.
 .Pp
 All widgets are disabled by default.
 When a directive occurs several times, the last occurrence wins.
-Unknown keywords are reported and ignored; malformed values, unknown
-widget names and unknown colour slots are fatal errors.
-Diagnostics include the file name and line number.
+An unknown keyword with an argument is reported and ignored; an
+unknown keyword without an argument is treated as a missing argument
+and is fatal.
+Malformed numeric values, missing arguments, unknown widget names,
+unknown colour slots, invalid interface names, overlong lines, and a
+missing
+.Ic logo
+are fatal errors.
+Colour names and font patterns are not syntax-checked at parse time;
+unusable values are reported and replaced with defaults when X11 is
+initialized.
+Parse diagnostics include the file name and line number; I/O errors and
+the missing-logo error include the file name.
 .Sh FILES
 .Bl -tag -width "~/.openbarrc" -compact
 .It Pa ~/.openbarrc
@@ -133,8 +171,8 @@ show date
 show cpu
 show mem
 show load
-show net
 show vpn
+show net
 hide bat
 .Ed
 .Sh SEE ALSO

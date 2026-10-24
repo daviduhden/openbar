@@ -1,9 +1,10 @@
 /*
  * Configuration parser tests.  Run on any C23 host; exercises
- * defaults, directives, error reporting and the discovery fallbacks.
+ * defaults, directives, error reporting, quoting, and limits.
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,13 +43,43 @@ write_conf(const char *content)
 	return path;
 }
 
+static int saved_stderr = -1;
+
 static void
 quiet(void)
 {
-	if (freopen("/dev/null", "w", stderr) == nullptr) {
-		perror("freopen");
+	int fd;
+
+	if (saved_stderr == -1) {
+		saved_stderr = dup(STDERR_FILENO);
+		if (saved_stderr == -1) {
+			perror("dup");
+			exit(1);
+		}
+	}
+	fd = open("/dev/null", O_WRONLY);
+	if (fd == -1) {
+		perror("open /dev/null");
 		exit(1);
 	}
+	if (dup2(fd, STDERR_FILENO) == -1) {
+		perror("dup2");
+		exit(1);
+	}
+	close(fd);
+}
+
+static void
+unquiet(void)
+{
+	if (saved_stderr == -1)
+		return;
+	if (dup2(saved_stderr, STDERR_FILENO) == -1) {
+		perror("dup2");
+		exit(1);
+	}
+	close(saved_stderr);
+	saved_stderr = -1;
 }
 
 static void
@@ -122,9 +153,26 @@ test_missing_logo(void)
 {
 	char	   *path = write_conf("barheight 20\n");
 	struct conf c;
+	int	    rc;
 
 	quiet();
-	CHECK(conf_load(path, &c) == -1);
+	rc = conf_load(path, &c);
+	unquiet();
+	CHECK(rc == -1);
+	unlink(path);
+	free(path);
+}
+
+static void
+test_crlf(void)
+{
+	char	   *path = write_conf("logo crlf\r\n\r\nbarheight 20\r\n");
+	struct conf c;
+
+	CHECK(conf_load(path, &c) == 0);
+	CHECK_STR(c.logo, "crlf");
+	CHECK(c.barheight == 20);
+	conf_free(&c);
 	unlink(path);
 	free(path);
 }
@@ -151,9 +199,12 @@ expect_fail(const char *text)
 {
 	char	   *path = write_conf(text);
 	struct conf c;
+	int	    rc;
 
 	quiet();
-	CHECK(conf_load(path, &c) == -1);
+	rc = conf_load(path, &c);
+	unquiet();
+	CHECK(rc == -1);
 	unlink(path);
 	free(path);
 }
@@ -263,6 +314,7 @@ run_tests(void)
 {
 	test_defaults();
 	test_valid();
+	test_crlf();
 	test_missing_logo();
 	test_duplicate_last_wins();
 	test_invalid();

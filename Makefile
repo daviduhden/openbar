@@ -75,22 +75,22 @@ uninstall:
 	rm -f ${DESTDIR}${MANDIR}/man1/openbar.1 \
 	    ${DESTDIR}${MANDIR}/man5/openbarrc.5
 
-tests/config.o: config.c openbar.h
+tests/config.o: config.c openbar.h tests/strtonum.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
 	    -include tests/strtonum.h -c -o $@ config.c
 
-tests/fmt.o: fmt.c openbar.h
+tests/fmt.o: fmt.c openbar.h tests/strtonum.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
 	    -include tests/strtonum.h -c -o $@ fmt.c
 
-tests/ipc.o: ipc.c openbar.h
+tests/ipc.o: ipc.c openbar.h tests/strtonum.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} \
 	    -include tests/strtonum.h -c -o $@ ipc.c
 
 tests/test_support.o: tests/test_support.c
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -c -o $@ tests/test_support.c
 
-${TEST_BINS}: ${TEST_OBJS} openbar.h tests/test.h
+${TEST_BINS}: ${TEST_OBJS} ${TEST_SRCS} openbar.h tests/test.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
 
 test: ${TEST_BINS} test-locale

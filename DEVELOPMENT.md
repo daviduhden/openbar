@@ -1,6 +1,7 @@
 # Development
 
-`openbar` is deliberately small: a two-process OpenBSD status bar in ISO C23.
+`openbar` is deliberately small: a one- or two-process OpenBSD status bar in
+ISO C23.
 This document describes the internal architecture and the invariants that
 matter when changing it.
 
@@ -21,11 +22,12 @@ compat/       embedded portability shims (<stdckdint.h>); on the include
 tests/        host tests for the portable units and the locale policy
 ```
 
-The portable units (`config.c`, `fmt.c`, `ipc.c`) contain only ISO C23 and
-POSIX interfaces available on any test host; they are what `make test`
-compiles and runs.  The OpenBSD units are verified against the real OpenBSD
-and Xenocara headers on the target, but their logic is exercised indirectly
-through the portable units' tests where possible.
+The portable units (`config.c`, `fmt.c`, `ipc.c`) use ISO C23 and POSIX
+interfaces, plus the BSD `<err.h>` and `strtonum(3)` interfaces in `config.c`;
+the test build supplies a `strtonum(3)` shim. They are what `make test`
+compiles and runs.  The OpenBSD units must be verified against the real
+OpenBSD and Xenocara headers on the target, but their logic is exercised
+indirectly through the portable units' tests where possible.
 
 ## C23 usage
 
@@ -70,13 +72,14 @@ machinery.  Concretely:
   fmt.c rather than `strftime(3)` locale data.
 - The interface-name grammar in config.c uses explicit ASCII predicates
   instead of locale-sensitive `<ctype.h>` classification.
-- Text is UTF-8 end to end (Xft's `*Utf8` APIs); truncation of the bar
-  line never splits a multibyte sequence (`bappend()` in fmt.c).
+- Text is treated as UTF-8 end to end (Xft's `*Utf8` APIs); truncation of the
+  bar line never splits a multibyte sequence (`bappend()` in fmt.c).  Input
+  values are not validated as UTF-8.
 
 The supported environment is `en_US.UTF-8` in the sense that openbar
 behaves identically everywhere: the interface is English, all text is
-UTF-8, and no other locale's conventions (decimal commas, translated
-names, legacy encodings) can ever affect it.
+treated as UTF-8, and no other locale's conventions (decimal commas,
+translated names, legacy encodings) can ever affect it.
 
 ## State
 
@@ -87,23 +90,27 @@ names, legacy encodings) can ever affect it.
 - per-widget refresh deadlines (`due[]`, monotonic clock);
 - collected metrics (hostname, CPU speed/temperature, memory, load,
   battery, addresses, VPN state);
-- the rendered bar line (`bar_text`), per-widget segments (`seg[]`) and the
-  `dirty` flag.
+- the composed bar line (`bar_text`), used for change detection, plus
+  per-widget segments (`seg[]`) and the `dirty` flag. Drawing re-composes
+  the line from the logo and segments.
 
-There is no other mutable global state; the only file-scope variables are
-two `volatile sig_atomic_t` signal flags in `openbar.c`, written exclusively
-by async-signal-safe handlers and read in the main loop.
+There is no other mutable global state; the only file-scope variable is
+`quit_flag`, a `volatile sig_atomic_t` in `openbar.c`, written exclusively
+by an async-signal-safe handler and read in the main loop.
 
 ## Ownership and lifetime
 
 The dynamic state is small and its ownership rules are explicit:
 
 - `struct conf` owns every `char *` it exposes (`logo`, `interface`,
-  `fontname`, `colors[]`).  `conf_defaults()` allocates them, `conf_load()`
-  replaces them (last directive wins) and always leaves the structure either
-  fully valid or freed, and `conf_free()` releases them and is idempotent
-  (it sets each pointer to `nullptr`).  No other object borrows these strings
-  beyond the call in which they are used.
+  `fontname`, `colors[]`).  `conf_defaults()` allocates the default `fontname`
+  and all `colors[]`; `logo` and `interface` stay `nullptr` until a directive
+  sets them.  It must be called on a zeroed or uninitialized structure; it does
+  not free previous contents.  `conf_load()` replaces them (last directive
+  wins) and always leaves the structure either fully valid or freed, and
+  `conf_free()` releases them and is idempotent (it sets each pointer to
+  `nullptr`).  No other object borrows these strings beyond the call in which
+  they are used.
 - The configuration path from `conf_resolve_path()` and the X authority path
   from `resolve_xauthority()` are owned by the caller; `main()` frees each
   exactly once, on every exit path.
@@ -124,16 +131,16 @@ The dynamic state is small and its ownership rules are explicit:
 
 ```
 locale_init()           pin the C locale; fatal on failure
+tzset(3)                cache zoneinfo before the unveil lock
 parse arguments (getopt)
 -> resolve configuration path ($HOME-aware, then defaults)
 -> load configuration (fatal on malformed values)
--> tzset(3)                cache zoneinfo before the unveil lock
 -> fork network worker     only if "net" is enabled; the child unveils and
                            pledges itself ("stdio rpath inet dns")
 -> XOpenDisplay, allocate Xft colours, open the font, create the window
 -> open /dev/apm           only if "bat" is enabled
--> sample hw.cpuspeed      once; not pledge-readable later
 -> unveil(2) + lock        /tmp/.X11-unix, Xauthority, /dev/apm, font dirs
+-> sample hw.cpuspeed      once; not pledge-readable later
 -> pledge(2)               "stdio rpath" + vminfo + route as needed
 -> event loop (poll(2))
 -> cleanup
@@ -147,11 +154,13 @@ draw time, which is why the standard font directories remain visible and
 
 ## Refresh model
 
-Each enabled widget has a monotonic deadline (`due[]`) and a period:
+Each enabled widget has a monotonic deadline (`due[]`) and a period.
+The date widget derives its deadline from the monotonic clock but uses the
+wall clock to align with the next minute boundary.
 
 | widget   | period                 |
 |----------|------------------------|
-| date     | next minute boundary   |
+| date     | next wall-clock minute |
 | cpu      | 5 s (temperature)      |
 | mem      | 2 s                    |
 | load     | 2 s                    |
@@ -182,17 +191,17 @@ The protocol is described in `openbar.h`:
 
 Both peers run the same program image (`fork(2)`, no `exec`), so padding is
 irrelevant, but the decoder (`ipc_decode`) still validates the magic byte,
-the status codes and both addresses with `inet_pton(3)` – the display
-process never trusts the worker blindly.
+the status codes, and each address whose status is `NET_OK` with
+`inet_pton(3)` – the display process never trusts the worker blindly.
 
 The parent uses a small state machine: `IPC_IDLE` → send request →
 `IPC_FETCHING` → collect bytes with `recv(MSG_DONTWAIT)` until the frame is
 complete.  A stalled worker (no complete frame within 30 s), EOF or a hard
 error transitions to `IPC_BROKEN`: the descriptor is closed, the worker is
-terminated and public addresses show `N/A` until restart.  There is no
-respawn: `fork(2)` after `pledge(2)` would require the `proc` promise,
-which is deliberately not retained.  Reading is strictly non-blocking, so a
-hung network never stalls the X11 event loop.
+left to exit on EOF or a failed write, and public addresses show `N/A` until
+restart.  There is no respawn: `fork(2)` after `pledge(2)` would require the
+`proc` promise, which is deliberately not retained.  Reading is strictly
+non-blocking, so a hung network never stalls the X11 event loop.
 
 ## Network worker
 
@@ -205,9 +214,12 @@ IPv6, sequentially):
    the resolved chain at a time;
 3. `tls_connect_socket(3)` with SNI/hostname verification against
    `/etc/ssl/cert.pem`;
-4. a bounded HTTP/1.1 `GET /ip` exchange under 5 s socket timeouts;
+4. a bounded HTTP/1.1 `GET /ip` exchange with 5 s receive/send socket
+   timeouts per operation; DNS and the whole fetch have no separate total
+   deadline, so the parent's 30 s deadline can expire first;
 5. response parsing: status line must be `200`, body must be exactly one
-   address of the requested family, total response capped at 1024 bytes.
+   address of the requested family, and the response buffer is 1024 bytes
+   (1023 accumulated bytes already fails).
 
 `libtls` and `libcrypto` are userland code; they need `rpath` in addition to
 `stdio inet dns` because libtls opens `/etc/ssl/cert.pem` to verify the
@@ -219,8 +231,9 @@ server certificate (`dns` alone only covers the resolver files).
   permitted by pledge under any promise set.
 - `hw.cpuspeed` is **not** pledge-readable under any promise set; the CPU
   frequency is sampled once before pledging.
-- `APM_IOC_GETPOWER` is rejected under every promise set; with the battery
-  widget enabled the display process stays unpledged (unveil locked).
+- `APM_IOC_GETPOWER` is rejected under every promise set; when the battery
+  widget is enabled and `/dev/apm` can be opened, the display process stays
+  unpledged (unveil locked).
 - The worker resets its inherited signal handlers before serving so the
   parent can terminate it normally.
 - No external programs are executed; all metrics come from libc/kernel
@@ -232,8 +245,8 @@ server certificate (`dns` alone only covers the resolver files).
 make test
 ```
 
-runs the four host test binaries (configuration parsing, IPC codec,
-formatting, locale policy).  The test build uses
+runs the compat self-tests and the four host test binaries (configuration
+parsing, IPC codec, formatting, locale policy).  The test build uses
 `-D_POSIX_C_SOURCE`/`-D_DEFAULT_SOURCE` and a `strtonum(3)` shim solely to
 compile on non-OpenBSD hosts; neither appears in the production build.
 `TEST_MAIN()` pins the C locale exactly like the production program, so the
@@ -243,17 +256,23 @@ results do not depend on the host environment.
 binaries are re-run under `LANG=en_US.UTF-8`, `LC_ALL=en_US.UTF-8`,
 `LANG=de_DE.UTF-8`, `LANG=es_ES.UTF-8`, `LC_MESSAGES=fr_FR.UTF-8`,
 `LANG=C`, `LC_ALL=POSIX`, legacy encodings (GBK, KOI8-R, ISO-8859-1) and
-with no locale variables set; stdout, stderr and exit status must be
-byte-identical across all environments.  Suggested hygiene before
-committing:
+with no locale variables set.  Every run must exit zero, and stdout and
+stderr must be byte-identical across all environments.  Suggested hygiene
+before committing:
 
 ```sh
 make test
-clang -std=c23 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
-     -Wshadow -Wformat=2 -Wundef -Wpointer-arith -Wstrict-prototypes \
-     -Wmissing-prototypes -Werror -fsyntax-only config.c fmt.c ipc.c ...
-clang --analyze ...
+clang -std=c23 -Icompat -Wall -Wextra -Wpedantic -Wconversion \
+     -Wsign-conversion -Wshadow -Wformat=2 -Wundef -Wpointer-arith \
+     -Wstrict-prototypes -Wmissing-prototypes -Werror -fsyntax-only \
+     config.c fmt.c ipc.c
+clang --analyze -std=c23 -Icompat -D_POSIX_C_SOURCE=200809L \
+     -D_DEFAULT_SOURCE -include tests/strtonum.h config.c fmt.c ipc.c
 ```
+
+On a non-OpenBSD host, add `-D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE` and
+`-include tests/strtonum.h` when syntax-checking the portable units, matching
+the test build. The OpenBSD units also need the Makefile's X11 include paths.
 
 ## Style
 

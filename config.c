@@ -46,8 +46,9 @@
 
 #include "openbar.h"
 
-#define CONF_LINE_MAX 4096 /* per-line bound */
+#define CONF_LINE_MAX 4096 /* per-line bound, including the newline */
 #define HOME_MAX 1024	   /* $HOME length bound */
+#define COLOR_NAME_MAX 63  /* longest accepted color name */
 #define BARHEIGHT_MIN 12
 #define BARHEIGHT_MAX 60
 
@@ -186,19 +187,20 @@ static int
 parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 {
 	char	   *saveptr = nullptr, *token;
-	const char *errstr;
 	int	    gaps[4], n = 0;
 
 	for (token = strtok_r(arg, " \t", &saveptr); token != nullptr;
 	    token = strtok_r(nullptr, " \t", &saveptr)) {
-		auto v = strtonum(token, 0, INT_MAX, &errstr);
+		long long v;
+		const char *tokerr;
 
 		if (n == 4) {
 			warnx("%s:%zu: gap takes exactly four values", path,
 			    lineno);
 			return -1;
 		}
-		if (errstr != nullptr) {
+		v = strtonum(token, 0, INT_MAX, &tokerr);
+		if (tokerr != nullptr) {
 			warnx("%s:%zu: invalid gap value '%s'", path, lineno,
 			    token);
 			return -1;
@@ -238,12 +240,13 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 		    "%s:%zu: color requires a slot and a value", path, lineno);
 		return -1;
 	}
-	if (strlen(unquoted) > 63) {
-		warnx("%s:%zu: color name too long", path, lineno);
-		return -1;
-	}
 	for (i = 0; i < COLOR_NITEMS; i++) {
 		if (strcmp(arg, color_names[i]) == 0) {
+			if (strlen(unquoted) > COLOR_NAME_MAX) {
+				warnx("%s:%zu: color name too long", path,
+				    lineno);
+				return -1;
+			}
 			setstr(&c->colors[i], unquoted);
 			return 0;
 		}
@@ -262,7 +265,7 @@ parse_logo(const char *path, size_t lineno, const char *value, struct conf *c)
 		return -1;
 	}
 	if (len > LOGO_MAX) {
-		warnx("%s:%zu: logo exceeds %d characters", path, lineno,
+		warnx("%s:%zu: logo exceeds %d bytes", path, lineno,
 		    LOGO_MAX);
 		return -1;
 	}
@@ -302,8 +305,12 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 {
 	const char *errmsg;
 	char	   *kw, *arg, *value;
+	size_t	    len;
 
 	line[strcspn(line, "\n")] = '\0';
+	len = strlen(line);
+	if (len > 0 && line[len - 1] == '\r')
+		line[len - 1] = '\0';
 	kw = trim(line);
 	if (*kw == '\0' || *kw == '#')
 		return 0;
@@ -425,6 +432,7 @@ conf_load(const char *path, struct conf *c)
 	FILE  *fp = nullptr;
 	char  *line = nullptr;
 	size_t cap = 0, lineno = 0;
+	ssize_t nread;
 	int    rc = -1;
 
 	conf_defaults(c);
@@ -435,11 +443,16 @@ conf_load(const char *path, struct conf *c)
 		goto out;
 	}
 
-	while (getline(&line, &cap, fp) != -1) {
+	while ((nread = getline(&line, &cap, fp)) != -1) {
 		lineno++;
-		if (strlen(line) > CONF_LINE_MAX) {
-			warnx("%s:%zu: line exceeds %d characters", path,
+		if ((size_t)nread > CONF_LINE_MAX) {
+			warnx("%s:%zu: line exceeds %d bytes", path,
 			    lineno, CONF_LINE_MAX);
+			goto out;
+		}
+		if (memchr(line, '\0', (size_t)nread) != nullptr) {
+			warnx("%s:%zu: NUL byte in configuration line", path,
+			    lineno);
 			goto out;
 		}
 		if (conf_parse_line(path, lineno, line, c) == -1)
