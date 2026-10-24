@@ -60,7 +60,7 @@ test_fmt_mem_load(void)
 	app.mem_valid = true;
 	app.mem_free_mb = 1024;
 	fmt_widget(&app, WIDGET_MEM, &it);
-	CHECK_STR(it.text, "Mem: 1024 MB");
+	CHECK_STR(it.text, "Mem: 1024 MiB");
 
 	app.mem_valid = false;
 	fmt_widget(&app, WIDGET_MEM, &it);
@@ -187,7 +187,7 @@ test_compose(void)
 	app.mem_free_mb = 512;
 
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 512 MB |");
+	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 512 MiB |");
 	CHECK(app.dirty);
 
 	/* recomposing unchanged state must not mark it dirty again */
@@ -198,7 +198,7 @@ test_compose(void)
 	/* a metric change rebuilds the line */
 	app.mem_free_mb = 513;
 	compose_bar(&app);
-	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 513 MB |");
+	CHECK_STR(app.bar_text, "| OpenBar | puffy | Mem: 513 MiB |");
 	CHECK(app.dirty);
 
 	/* nothing enabled, no logo: empty line */

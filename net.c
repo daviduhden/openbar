@@ -38,8 +38,9 @@
  *
  * Sandbox: filesystem visibility is locked to the resolver and TLS
  * certificate files; pledge(2) restricts the process to
- * "stdio inet dns".  libtls/libcrypto are pure userland code and need
- * no additional promises.
+ * "stdio rpath inet dns".  libtls/libcrypto are pure userland code, but
+ * libtls reads the CA bundle, so "rpath" is required in addition to
+ * "inet" and "dns".
  *
  * Threat model: TLS authenticates ifconfig.me, so an on-path attacker
  * cannot substitute another address for the real response without a
@@ -73,7 +74,8 @@
 static int http_fetch(int, char *, size_t);
 static int tcp_connect(struct addrinfo *);
 static int set_timeouts(int);
-static int parse_response(const char *, int, char *, size_t);
+static int parse_response(
+    const char *, size_t, int, char *, size_t);
 static int unveil_worker(void);
 
 /*
@@ -139,14 +141,16 @@ http_fetch(int family, char *out, size_t outlen)
 	struct tls_config *tls_cfg;
 	struct tls	  *ctx;
 	char		   buf[RESPONSE_MAX];
-	const char	   req[] = "GET /ip HTTP/1.1\r\nHost: "
-				   "ifconfig.me\r\nConnection: close\r\n\r\n";
+	const char	   req[] = "GET " PUBLIC_PATH " HTTP/1.1\r\nHost: "
+				   PUBLIC_HOST
+				   "\r\nConnection: close\r\n\r\n";
 	size_t		   total;
 	int		   sockfd, rc;
 	ssize_t		   n;
 
 	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_NUMERICSERV;
 	if (getaddrinfo(PUBLIC_HOST, PUBLIC_PORT, &hints, &res) != 0)
 		return NET_ERR_DNS;
 
@@ -227,7 +231,7 @@ http_fetch(int family, char *out, size_t outlen)
 		}
 	}
 	buf[total] = '\0';
-	rc = parse_response(buf, family, out, outlen);
+	rc = parse_response(buf, total, family, out, outlen);
 done:
 	tls_close(ctx);
 	tls_free(ctx);
@@ -238,28 +242,41 @@ done:
 /*
  * Extract the body of a 200 response, trim surrounding whitespace,
  * bound its length and require it to be exactly one address of the
- * requested family.  Never displays unvalidated remote data.
+ * requested family.  Never displays unvalidated remote data.  The
+ * response length is explicit so an embedded NUL cannot hide trailing
+ * bytes.
  */
 static int
-parse_response(const char *buf, int family, char *out, size_t outlen)
+parse_response(
+    const char *buf, size_t buflen, int family, char *out, size_t outlen)
 {
-	const char *body, *end;
-	size_t	    len;
+	const char *body = nullptr, *end;
+	size_t	    i, len;
 
-	if (strncmp(buf, "HTTP/1.1 200", 12) != 0 &&
-	    strncmp(buf, "HTTP/1.0 200", 12) != 0)
+	if (buflen < 13)
 		return NET_ERR_PARSE;
-	body = strstr(buf, "\r\n\r\n");
+	if ((strncmp(buf, "HTTP/1.1 200", 12) != 0 &&
+		strncmp(buf, "HTTP/1.0 200", 12) != 0) ||
+	    (buf[12] != ' ' && buf[12] != '\r' && buf[12] != '\n'))
+		return NET_ERR_PARSE;
+	for (i = 0; i + 3 < buflen; i++) {
+		if (buf[i] == '\r' && buf[i + 1] == '\n' &&
+		    buf[i + 2] == '\r' && buf[i + 3] == '\n') {
+			body = buf + i + 4;
+			break;
+		}
+	}
 	if (body == nullptr)
 		return NET_ERR_PARSE;
-	body += 4;
-	end = body + strlen(body);
+	end = buf + buflen;
 	while (end > body &&
 	    (end[-1] == '\r' || end[-1] == '\n' || end[-1] == ' ' ||
 		end[-1] == '\t'))
 		end--;
 	len = (size_t)(end - body);
 	if (len == 0 || len >= outlen)
+		return NET_ERR_PARSE;
+	if (memchr(body, '\0', len) != nullptr)
 		return NET_ERR_PARSE;
 	memcpy(out, body, len);
 	out[len] = '\0';
@@ -348,10 +365,14 @@ net_worker_start(struct openbar *app)
 		sigaction(SIGINT, &sa, nullptr);
 
 		close(sv[1]);
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		if (unveil_worker() == -1)
+		if (sv[0] != STDIN_FILENO)
+			close(STDIN_FILENO);
+		if (sv[0] != STDOUT_FILENO)
+			close(STDOUT_FILENO);
+		if (unveil_worker() == -1) {
+			warn("unveil: network worker");
 			_exit(1);
+		}
 		if (pledge("stdio rpath inet dns", nullptr) == -1)
 			err(1, "pledge: network worker");
 		net_worker(sv[0]);

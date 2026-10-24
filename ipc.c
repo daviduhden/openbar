@@ -122,6 +122,8 @@ write_full(int fd, const void *buf, size_t n)
 				continue;
 			return -1;
 		}
+		if (r == 0)
+			return -1; /* no progress; avoid an infinite loop */
 		if (ckd_sub(&left, left, (size_t)r))
 			return -1; /* unreachable: write() never over-reports */
 		p += r;

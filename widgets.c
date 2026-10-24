@@ -175,6 +175,8 @@ cpu_sensor_find(struct openbar *app)
 		}
 		if (strncmp(sd.xname, "cpu", 3) == 0 ||
 		    strncmp(sd.xname, "km", 2) == 0) {
+			if (sd.maxnumt[SENSOR_TEMP] <= 0)
+				continue; /* no temperature channel */
 			app->cpu_sensor = dev + 1;
 			return dev;
 		}
@@ -197,7 +199,7 @@ collect_cpu(struct openbar *app)
 	mib[3] = SENSOR_TEMP;
 	mib[4] = 0;
 	if (dev >= 0 && sysctl(mib, 5, &s, &len, nullptr, 0) != -1 &&
-	    (s.flags & SENSOR_FINVALID) == 0) {
+	    (s.flags & (SENSOR_FINVALID | SENSOR_FUNKNOWN)) == 0) {
 		app->cpu_temp =
 		    (int)((s.value - MICROKELVIN_FREEZING) / 1'000'000);
 		app->cpu_have_temp = true;
@@ -254,10 +256,10 @@ collect_bat(struct openbar *app)
 }
 
 /*
- * Interface state: the private IPv4 address of the configured
- * interface and WireGuard presence.  A WireGuard tunnel counts as
- * active when a wg* interface is up, running and has an address;
- * wg(4) sets IFF_RUNNING once its UDP socket is bound.
+ * Interface state: the IPv4 address of the configured interface and
+ * WireGuard presence.  A WireGuard tunnel counts as active when a wg*
+ * interface is up, running and has an address; wg(4) sets IFF_RUNNING
+ * once its UDP socket is bound.
  */
 static void
 collect_ifaddrs(struct openbar *app)
@@ -277,7 +279,7 @@ collect_ifaddrs(struct openbar *app)
 			continue;
 
 		/*
-		 * Private IPv4.  The configured interface wins; when it
+		 * Interface IPv4.  The configured interface wins; when it
 		 * is absent (or none is configured) fall back to the
 		 * first usable interface so the widget still shows an
 		 * address instead of N/A.

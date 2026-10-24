@@ -111,11 +111,10 @@ static void ipc_read(struct openbar *);
 static void apply_response(struct openbar *);
 static void worker_lost(struct openbar *);
 
-/* refresh periods in seconds; the date widget re-aligns to minute
- * boundaries, so its nominal interval is one second */
+/* Refresh periods in seconds; the date widget aligns directly to the next
+ * wall-clock minute boundary instead of using this table. */
 static const int widget_intervals[WIDGET_NITEMS] = {
     [WIDGET_HOSTNAME] = 60,
-    [WIDGET_DATE] = 1,
     [WIDGET_CPU] = 5,
     [WIDGET_MEM] = 2,
     [WIDGET_LOAD] = 2,
@@ -595,12 +594,22 @@ static void
 schedule(struct openbar *app, enum widget w, const struct timespec *now)
 {
 	app->due[w] = *now;
+	if (w == WIDGET_DATE) {
+		struct timespec wall;
+
+		/* Align with the next wall-clock minute boundary.  The
+		 * monotonic clock is used for the deadline; the wall clock
+		 * supplies the phase.  Compute from the current second so a
+		 * collection at second 59 does not skip a minute. */
+		if (clock_gettime(CLOCK_REALTIME, &wall) == 0)
+			app->due[w].tv_sec += 60 - (wall.tv_sec % 60);
+		else
+			app->due[w].tv_sec += 60;
+		app->due[w].tv_nsec = 0;
+		return;
+	}
 	app->due[w].tv_sec += widget_intervals[w];
 	app->due[w].tv_nsec = 0;
-	if (w == WIDGET_DATE) {
-		/* align with the next minute boundary */
-		app->due[w].tv_sec += 60 - (app->due[w].tv_sec % 60);
-	}
 }
 
 /* Collect every widget whose deadline has passed, then recompose. */
@@ -720,6 +729,11 @@ ipc_read(struct openbar *app)
 	struct timespec now;
 	ssize_t		n;
 
+	if (app->ipc_state != IPC_FETCHING) {
+		/* Unsolicited data means the peer broke the protocol. */
+		worker_lost(app);
+		return;
+	}
 	n = recv(app->ipc_fd, app->ipc_rbuf + app->ipc_rlen,
 	    sizeof(app->ipc_rbuf) - app->ipc_rlen, MSG_DONTWAIT);
 	if (n > 0) {
@@ -734,7 +748,8 @@ ipc_read(struct openbar *app)
 		app->fetch_due.tv_sec += FETCH_INTERVAL;
 		return;
 	}
-	if (n == 0 || (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK))
+	if (n == 0 || (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK &&
+			  errno != EINTR))
 		worker_lost(app);
 }
 
@@ -807,8 +822,10 @@ main(int argc, char *argv[])
 	}
 
 	resolved = conf_resolve_path(confpath);
-	if (conf_load(resolved, &app.conf) == -1)
+	if (conf_load(resolved, &app.conf) == -1) {
+		free(resolved);
 		exit(EXIT_FAILURE);
+	}
 	free(resolved);
 
 	setup_signals();
