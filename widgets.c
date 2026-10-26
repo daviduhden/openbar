@@ -53,6 +53,11 @@ static void collect_bat(struct openbar *);
 static void collect_ifaddrs(struct openbar *);
 static int  cpu_sensor_find(struct openbar *);
 
+/*
+ * Dispatch one widget refresh.  Metrics are stored directly in struct
+ * openbar; the corresponding formatter runs later in fmt.c so collection and
+ * presentation stay independent.
+ */
 void
 collect_widget(struct openbar *app, enum widget w)
 {
@@ -85,6 +90,11 @@ collect_widget(struct openbar *app, enum widget w)
 	}
 }
 
+/*
+ * Collect the host name.  gethostname(3) may succeed without NUL-terminating
+ * when the name fills the buffer, so the last byte is forced to NUL before the
+ * formatter treats it as a string.
+ */
 static void
 collect_hostname(struct openbar *app)
 {
@@ -156,6 +166,12 @@ cpu_sensor_find(struct openbar *app)
 	return -1;
 }
 
+/*
+ * Sample the CPU temperature from the first available cpu or km sensor.
+ * Values are stored in microkelvin, so the freezing point is subtracted and
+ * the result scaled to degrees Celsius.  Invalid or unknown sensor states are
+ * treated as "no temperature" rather than displayed as a bogus value.
+ */
 static void
 collect_cpu(struct openbar *app)
 {
@@ -179,6 +195,11 @@ collect_cpu(struct openbar *app)
 	app->cpu_have_temp = false;
 }
 
+/*
+ * Report free physical memory in MiB from VM_UVMEXP.  The multiplication is
+ * checked because both the page count and page size come from the kernel; an
+ * overflow marks the sample invalid instead of wrapping the displayed value.
+ */
 static void
 collect_mem(struct openbar *app)
 {
@@ -204,12 +225,23 @@ collect_mem(struct openbar *app)
 	app->mem_valid = true;
 }
 
+/*
+ * Ask the kernel for the one-minute load average.  getloadavg(3) returns the
+ * number of samples written; only a complete single sample is considered
+ * valid.
+ */
 static void
 collect_load(struct openbar *app)
 {
 	app->load_valid = getloadavg(&app->load1, 1) == 1;
 }
 
+/*
+ * Read the battery percentage through the pre-opened /dev/apm descriptor.
+ * The descriptor is opened before pledge(2), so no filesystem access is needed
+ * here.  Unknown states and percentages outside 0..100 are reported as
+ * unavailable rather than clamped to a misleading value.
+ */
 static void
 collect_bat(struct openbar *app)
 {

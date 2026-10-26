@@ -57,6 +57,11 @@ test_decimal_separator(void)
 	conf_free(&app.conf);
 }
 
+/*
+ * Build a wall-clock timestamp from local calendar fields and assert the exact
+ * English date formatting.  mktime(3) may normalize the fields, so callers use
+ * valid dates.
+ */
 static void
 check_date(struct openbar *app, int year, int mon, int mday, int hour, int min,
     const char *expected)

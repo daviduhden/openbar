@@ -89,6 +89,11 @@ fail:
 	return -1;
 }
 
+/*
+ * Apply a receive and send timeout to the socket.  libtls uses the underlying
+ * descriptor for both directions, so these bounds also limit TLS reads and
+ * writes after the handshake.
+ */
 static int
 set_timeouts(int fd)
 {
@@ -102,8 +107,10 @@ set_timeouts(int fd)
 }
 
 /*
- * Fetch PUBLIC_PATH for the given address family.  Returns a net
- * status code; on NET_OK, out holds the validated address.
+ * Fetch the public address for one address family.  Resolution, connection,
+ * TLS setup, the HTTP request and the response read are all bounded and
+ * failure at any stage maps to a status code for the parent.  The caller must
+ * not reuse the socket or TLS objects after this function returns.
  */
 static int
 http_fetch(int family, char *out, size_t outlen)
@@ -254,6 +261,12 @@ parse_response(
 	return valid_ip(out, family) ? NET_OK : NET_ERR_PARSE;
 }
 
+/*
+ * Worker main loop.  The parent sends one command per refresh; the worker
+ * fetches IPv4 and IPv6 sequentially and replies with one fixed-size frame.
+ * EOF on the socket means the display process exited, so the worker exits
+ * without touching shared state.
+ */
 void
 net_worker(int fd)
 {

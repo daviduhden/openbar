@@ -46,6 +46,12 @@ locale_init(void)
 	return setlocale(LC_ALL, "C") == nullptr ? -1 : 0;
 }
 
+/*
+ * Format one widget from already collected metrics.  This function performs
+ * no I/O and never fails: unavailable data is rendered as "N/A".  Only the
+ * battery widget sets the urgent flag, which makes the renderer use the urgent
+ * color for a critically low charge.
+ */
 void
 fmt_widget(const struct openbar *app, enum widget w, struct witem *out)
 {
