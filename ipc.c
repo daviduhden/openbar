@@ -102,7 +102,11 @@ write_full(int fd, const void *buf, size_t n)
 	return (ssize_t)n;
 }
 
-/* Strict IPv4/IPv6 syntax check; 1 valid, 0 otherwise. */
+/*
+ * Strict textual address validation.  inet_pton(3) is used instead of a
+ * permissive resolver or prefix parser so the IPC decoder can reject anything
+ * that is not exactly one IPv4 or IPv6 address.
+ */
 int
 valid_ip(const char *s, int family)
 {
@@ -113,6 +117,10 @@ valid_ip(const char *s, int family)
 	return inet_pton(family, s, buf) == 1;
 }
 
+/*
+ * Send the one-byte fetch command.  A short write is treated as a broken
+ * channel; the caller switches to the broken state and stops using the worker.
+ */
 int
 ipc_send_fetch(int fd)
 {
@@ -122,6 +130,11 @@ ipc_send_fetch(int fd)
 									   -1;
 }
 
+/*
+ * Copy a string into a fixed-size protocol field, truncating if necessary.
+ * Successful encoding always leaves a NUL terminator because the decoder and
+ * the display process treat these fields as C strings.
+ */
 static void
 copybounded(char *dst, const char *src, size_t dstsz)
 {

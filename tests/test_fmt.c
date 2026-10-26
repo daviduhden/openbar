@@ -9,6 +9,11 @@
 #include "../openbar.h"
 #include "test.h"
 
+/*
+ * Reset an application state to the same defaults main() uses before any
+ * widget data has been collected.  Sentinel descriptor and battery values keep
+ * formatters on their unavailable paths.
+ */
 static void
 fresh_app(struct openbar *app)
 {

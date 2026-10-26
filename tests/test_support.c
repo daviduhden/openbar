@@ -9,6 +9,11 @@
 #include <stdlib.h>
 
 #ifndef __OpenBSD__
+/*
+ * Minimal strtonum(3) replacement for non-OpenBSD test hosts.  It follows the
+ * BSD contract: reject an inverted range, parse the whole string, set *errstrp
+ * to a static diagnostic on failure, and return the clamped boundary value.
+ */
 long long
 strtonum(const char *numstr, long long minval, long long maxval,
     const char **errstrp)

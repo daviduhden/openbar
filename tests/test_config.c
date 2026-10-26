@@ -13,6 +13,10 @@
 #include "../openbar.h"
 #include "test.h"
 
+/*
+ * Write a temporary configuration file and return its path.  The caller owns
+ * the returned string and the file; tests unlink both after use.
+ */
 static char *
 write_conf(const char *content)
 {
@@ -45,6 +49,10 @@ write_conf(const char *content)
 
 static int saved_stderr = -1;
 
+/*
+ * Suppress the warning output expected from negative test cases.  The original
+ * stderr descriptor is duplicated so unquiet() can restore it exactly.
+ */
 static void
 quiet(void)
 {
@@ -69,6 +77,7 @@ quiet(void)
 	close(fd);
 }
 
+/* Restore the stderr descriptor saved by quiet(). */
 static void
 unquiet(void)
 {
@@ -194,6 +203,10 @@ test_duplicate_last_wins(void)
 	free(path);
 }
 
+/*
+ * Assert that the given configuration text is rejected.  Diagnostics are
+ * silenced because the parser prints the expected error to stderr.
+ */
 static void
 expect_fail(const char *text)
 {

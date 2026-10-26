@@ -60,6 +60,10 @@ static int   parse_interface(const char *, size_t, const char *, struct conf *);
 static char *strip_quotes(char *, const char **);
 static char *trim(char *);
 
+/*
+ * Duplicate a string for storage in struct conf.  Allocation failure is
+ * fatal because configuration state has no meaningful partial value.
+ */
 static char *
 xstrdup(const char *str)
 {
@@ -87,6 +91,11 @@ ident_char(unsigned char c)
 	return ident_start(c) || (c >= '0' && c <= '9') || c == '-' || c == '.';
 }
 
+/*
+ * Replace one owned configuration string.  The old value is released before
+ * the new copy is installed; a failed allocation terminates the process, so
+ * the destination is never left dangling.
+ */
 static void
 setstr(char **dest, const char *value)
 {
@@ -94,6 +103,10 @@ setstr(char **dest, const char *value)
 	*dest = xstrdup(value);
 }
 
+/*
+ * Trim leading and trailing spaces and tabs in place.  The returned pointer
+ * may differ from the argument, and the original buffer is still modified.
+ */
 static char *
 trim(char *s)
 {
@@ -138,6 +151,11 @@ strip_quotes(char *arg, const char **errmsg)
 	return arg + 1;
 }
 
+/*
+ * Convert a numeric directive with strtonum(3), which rejects trailing
+ * characters and reports the valid range.  The diagnostic includes the source
+ * path and line so configuration errors can be fixed without guesswork.
+ */
 static int
 parse_int(const char *path, size_t lineno, const char *value, long long min,
     long long max, int *out)
@@ -154,6 +172,11 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
 	return 0;
 }
 
+/*
+ * Parse the four nonnegative gap values in top, bottom, left, right order.
+ * The argument is split in place; extra or missing values are rejected rather
+ * than silently defaulted, because a malformed gap changes the whole layout.
+ */
 static int
 parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 {
@@ -186,6 +209,11 @@ parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 	return 0;
 }
 
+/*
+ * Parse "color SLOT VALUE".  The slot must be one of the fixed names and the
+ * value may be quoted.  Only the selected slot is replaced; the other palette
+ * entries keep their previous values.
+ */
 static int
 parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 {
@@ -226,6 +254,10 @@ parse_color(const char *path, size_t lineno, char *arg, struct conf *c)
 	return -1;
 }
 
+/*
+ * Validate and store the logo text.  The limit is a byte bound so the logo
+ * can never consume the whole bar line before any widget is appended.
+ */
 static int
 parse_logo(const char *path, size_t lineno, const char *value, struct conf *c)
 {
@@ -244,6 +276,12 @@ parse_logo(const char *path, size_t lineno, const char *value, struct conf *c)
 	return 0;
 }
 
+/*
+ * Validate an interface name against the conservative OpenBSD ifname grammar:
+ * an ASCII letter or underscore first, then ASCII letters, digits, underscore,
+ * hyphen or dot.  This keeps the configured value free of locale-dependent or
+ * shell-significant bytes; the collector later compares it by exact name.
+ */
 static int
 parse_interface(
     const char *path, size_t lineno, const char *value, struct conf *c)
@@ -271,6 +309,12 @@ parse_interface(
 	return 0;
 }
 
+/*
+ * Parse one configuration line.  Blank lines and '#' comments are ignored.
+ * "show" and "hide" toggle a widget; every other keyword requires an
+ * argument.  Unknown keywords are reported but do not abort the load, which
+ * keeps older configurations usable when new directives are added.
+ */
 static int
 conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 {
@@ -349,6 +393,11 @@ conf_parse_line(const char *path, size_t lineno, char *line, struct conf *c)
 	return 0;
 }
 
+/*
+ * Map a widget name to its enum value.  The table is indexed by the enum, so
+ * adding a widget requires updating both the enum and this table; -1 means
+ * the caller supplied an unknown name.
+ */
 int
 widget_lookup(const char *name)
 {
@@ -361,6 +410,12 @@ widget_lookup(const char *name)
 	return -1;
 }
 
+/*
+ * Initialize a configuration with the built-in defaults.  The structure must
+ * not already own strings; this function zeroes it and then allocates the font
+ * name and every palette entry.  logo and interface intentionally remain null
+ * until a directive supplies them.
+ */
 void
 conf_defaults(struct conf *c)
 {
@@ -373,6 +428,10 @@ conf_defaults(struct conf *c)
 		c->colors[i] = xstrdup(default_colors[i]);
 }
 
+/*
+ * Release all strings owned by a configuration.  Every pointer is cleared so
+ * a second call, or a cleanup path after a partial load, remains safe.
+ */
 void
 conf_free(struct conf *c)
 {

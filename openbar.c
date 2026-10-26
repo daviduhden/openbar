@@ -160,7 +160,12 @@ xio_handler(Display *)
 	_exit(EXIT_FAILURE);
 }
 
-/* Resolve the X authority file for the unveil policy. */
+/*
+ * Resolve the X authority path before the unveil lock.  XAUTHORITY wins when
+ * set; otherwise the conventional $HOME/.Xauthority is resolved.  The returned
+ * string is owned by the caller.  A missing file is not an error here; it only
+ * leaves no authority path to unveil before the X connection is attempted.
+ */
 static char *
 resolve_xauthority(void)
 {
@@ -199,7 +204,11 @@ resolve_xauthority(void)
 	return nullptr;
 }
 
-/* Unveil an existing path for reading; absent paths are fine. */
+/*
+ * Unveil an optional path with read access.  A path that does not exist is
+ * ignored because the corresponding optional subsystem is absent; any other
+ * unveil failure is fatal to setup.
+ */
 static int
 unveil_read(const char *path)
 {
@@ -299,6 +308,12 @@ build_pledge(char *buf, size_t bufsz, const struct conf *c)
 		strlcat(buf, " route", bufsz);
 }
 
+/*
+ * Create the override-redirect bar window and publish the EWMH properties
+ * that keep it above other windows, out of task bars and pagers, and sticky
+ * across desktops.  The geometry is derived from the screen and configured
+ * gaps; negative width and excessive height are rejected or clamped here.
+ */
 static int
 window_create(struct xstate *x, const struct conf *c)
 {
@@ -428,6 +443,11 @@ fail:
 	return -1;
 }
 
+/*
+ * Release every X11/Xft resource owned by xstate.  The function tolerates a
+ * partially initialized state and clears each handle, so it is safe from the
+ * error path of xstate_open() and from normal shutdown.
+ */
 static void
 xstate_close(struct xstate *x)
 {
@@ -527,7 +547,11 @@ draw_line(struct openbar *app, struct xstate *x)
 	}
 }
 
-/* Repaint from cached state: cheap enough to run on every expose. */
+/*
+ * Repaint the whole bar from cached segments.  The caller has already
+ * composed the line and set the dirty flag; this path deliberately performs no
+ * metric collection so expose events remain cheap.
+ */
 static void
 redraw(struct openbar *app, struct xstate *x)
 {
@@ -538,6 +562,11 @@ redraw(struct openbar *app, struct xstate *x)
 	app->dirty = false;
 }
 
+/*
+ * Drain pending X events without blocking.  Only the final Expose event of a
+ * batch triggers a redraw; intermediate exposes are already covered by that
+ * repaint.
+ */
 static void
 handle_x_events(struct openbar *app, struct xstate *x)
 {
@@ -550,6 +579,10 @@ handle_x_events(struct openbar *app, struct xstate *x)
 	}
 }
 
+/*
+ * Compare two timespec values without subtraction, which could overflow on
+ * some platforms.  Returns -1, 0 or 1 in the usual ordering.
+ */
 static int
 timespec_cmp(const struct timespec *a, const struct timespec *b)
 {
@@ -606,8 +639,9 @@ collect_due(struct openbar *app)
 }
 
 /*
- * Milliseconds until the next widget deadline or IPC event, capped at
- * one second so that poll(2) stays responsive to X11 events.
+ * Compute the poll(2) timeout from the nearest widget deadline and the
+ * outstanding IPC fetch deadline.  The result is capped at one second so X11
+ * events and signal flags are observed promptly even when no deadline is near.
  */
 static int
 next_timeout_ms(struct openbar *app)
@@ -724,6 +758,11 @@ ipc_read(struct openbar *app)
 		worker_lost(app);
 }
 
+/*
+ * Apply a decoded worker response to the public address fields.  A malformed
+ * frame or a failed fetch displays "N/A"; it never leaves stale addresses that
+ * could be mistaken for the current result.
+ */
 static void
 apply_response(struct openbar *app)
 {
@@ -747,6 +786,12 @@ apply_response(struct openbar *app)
 	compose_bar(app);
 }
 
+/*
+ * Program entry point.  Initialization order is security-relevant: the
+ * configuration is loaded, the network worker is forked, X11 and APM resources
+ * are opened, and only then are unveil(2) and pledge(2) applied.  The single
+ * event loop owns all mutable state; no Xlib callback runs on another thread.
+ */
 int
 main(int argc, char *argv[])
 {
