@@ -94,11 +94,11 @@ tests/test_support.o: tests/test_support.c
 ${TEST_BINS}: ${TEST_OBJS} ${TEST_SRCS} openbar.h tests/test.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
 
-check-agent-sync:
+check-agent-knowledge:
 	@if [ -n "${BASE_REF}" ]; then \
-	    perl tools/check-agent-sync.pl --base-ref "${BASE_REF}"; \
+		python3 scripts/validate-agent-knowledge.py --scope range --base "${BASE_REF}" --head HEAD; \
 	else \
-	    perl tools/check-agent-sync.pl; \
+		python3 scripts/validate-agent-knowledge.py --scope worktree; \
 	fi
 
 test: ${TEST_BINS} test-locale
@@ -118,4 +118,5 @@ clean:
 	rm -f ${PROG} ${PROG}_debug ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
 .PHONY: all rebuild debug install install-conf uninstall test test-locale \
-	check-agent-sync clean
+	check-agent-knowledge
+.PHONY: clean

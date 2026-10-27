@@ -218,7 +218,7 @@ doas make uninstall
 
 Every repository change must update the relevant agent instructions or skill
 with reusable knowledge. See [AGENTS.md](AGENTS.md) for the mandatory review
-and run `make check-agent-sync` to check structural synchronization. Reviewers
+and run `make check-agent-knowledge` to check structural synchronization. Reviewers
 must also confirm semantic relevance; the checker cannot judge meaning. CI is
 not currently configured; see [DEVELOPMENT.md](DEVELOPMENT.md) for pull-request
 integration instructions.

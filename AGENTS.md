@@ -162,8 +162,8 @@ tests, workflows, documentation, architecture, agent instructions, and skills.
    skills for the same responsibility.
 5. Check documented paths and local references, command names, examples, and
    validation procedures against the repository. Run
-   `make check-agent-sync [BASE_REF=<git-ref>]` after edits. This target invokes
-   the Perl validator at `tools/check-agent-sync.pl`; the checker
+   `make check-agent-knowledge [BASE_REF=<git-ref>]` after edits. This target invokes
+   the canonical Python validator at `scripts/validate-agent-knowledge.py`; the checker
    verifies the Git change set, a substantive instruction/skill diff, basic
    Markdown/frontmatter structure, and local Markdown links. Run any
    additional validation required by the affected skill.
@@ -178,6 +178,27 @@ from completion if no substantive, relevant instruction or skill update is
 included, applicable files were not inspected, references/checks fail, or a
 limitation is left undocumented. If a required update cannot be made, document
 the reason and report the task as incomplete.
+
+### Shared Agent Knowledge Validation Contract
+
+Use `python3 scripts/validate-agent-knowledge.py --scope worktree` for local
+changes and `python3 -m unittest discover -s tests/agent_knowledge_validator -v`
+for its contract tests. The validator requires Python 3.11+ and Git, uses only
+the Python standard library, and publishes contract version `1.0.0`. All
+adopting repositories share the same CLI, AK001-AK006 identifiers, output
+schema, and exit codes (`0` pass, `1` policy failure, `2` execution/configuration
+error). For a pull request, pass both revisions with
+`--scope range --base BASE_REF --head HEAD_REF`; compare from their merge base.
+
+Read [Agent Knowledge Validation Contract](docs/agent-knowledge-validation.md)
+for the complete rules, JSON schema, optional repository configuration,
+warning semantics, and extension process. AK004 and AK006 can require human
+review; their warnings do not prove or disprove semantic correctness. Keep the
+canonical script and black-box unittest suite byte-identical across adopting
+repositories. Repository-specific requirements belong in the documented TOML
+configuration or a stable `AKX...` extension, never in a private fork of the
+shared rules. The GitHub PR workflow runs the same tests and range command;
+it does not edit files or require secrets.
 
 ### Mandatory Definition of Done
 
