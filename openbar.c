@@ -753,8 +753,9 @@ ipc_read(struct openbar *app)
 		app->fetch_due.tv_sec += FETCH_INTERVAL;
 		return;
 	}
-	if (n == 0 || (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK &&
-			  errno != EINTR))
+	if (n == 0 ||
+	    (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK &&
+		errno != EINTR))
 		worker_lost(app);
 }
 
