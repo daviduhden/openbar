@@ -180,12 +180,12 @@ parse_int(const char *path, size_t lineno, const char *value, long long min,
 static int
 parse_gaps(const char *path, size_t lineno, char *arg, struct conf *c)
 {
-	char	   *saveptr = nullptr, *token;
-	int	    gaps[4], n = 0;
+	char *saveptr = nullptr, *token;
+	int   gaps[4], n = 0;
 
 	for (token = strtok_r(arg, " \t", &saveptr); token != nullptr;
 	    token = strtok_r(nullptr, " \t", &saveptr)) {
-		long long v;
+		long long   v;
 		const char *tokerr;
 
 		if (n == 4) {
@@ -268,8 +268,7 @@ parse_logo(const char *path, size_t lineno, const char *value, struct conf *c)
 		return -1;
 	}
 	if (len > LOGO_MAX) {
-		warnx("%s:%zu: logo exceeds %d bytes", path, lineno,
-		    LOGO_MAX);
+		warnx("%s:%zu: logo exceeds %d bytes", path, lineno, LOGO_MAX);
 		return -1;
 	}
 	setstr(&c->logo, value);
@@ -459,11 +458,11 @@ conf_free(struct conf *c)
 int
 conf_load(const char *path, struct conf *c)
 {
-	FILE  *fp = nullptr;
-	char  *line = nullptr;
-	size_t cap = 0, lineno = 0;
+	FILE   *fp = nullptr;
+	char   *line = nullptr;
+	size_t	cap = 0, lineno = 0;
 	ssize_t nread;
-	int    rc = -1;
+	int	rc = -1;
 
 	conf_defaults(c);
 
@@ -476,8 +475,8 @@ conf_load(const char *path, struct conf *c)
 	while ((nread = getline(&line, &cap, fp)) != -1) {
 		lineno++;
 		if ((size_t)nread > CONF_LINE_MAX) {
-			warnx("%s:%zu: line exceeds %d bytes", path,
-			    lineno, CONF_LINE_MAX);
+			warnx("%s:%zu: line exceeds %d bytes", path, lineno,
+			    CONF_LINE_MAX);
 			goto out;
 		}
 		if (memchr(line, '\0', (size_t)nread) != nullptr) {

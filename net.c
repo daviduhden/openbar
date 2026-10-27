@@ -45,8 +45,7 @@
 static int http_fetch(int, char *, size_t);
 static int tcp_connect(struct addrinfo *);
 static int set_timeouts(int);
-static int parse_response(
-    const char *, size_t, int, char *, size_t);
+static int parse_response(const char *, size_t, int, char *, size_t);
 static int unveil_worker(void);
 
 /*
@@ -119,12 +118,11 @@ http_fetch(int family, char *out, size_t outlen)
 	struct tls_config *tls_cfg;
 	struct tls	  *ctx;
 	char		   buf[RESPONSE_MAX];
-	const char	   req[] = "GET " PUBLIC_PATH " HTTP/1.1\r\nHost: "
-				   PUBLIC_HOST
-				   "\r\nConnection: close\r\n\r\n";
-	size_t		   total;
-	int		   sockfd, rc;
-	ssize_t		   n;
+	const char req[] = "GET " PUBLIC_PATH " HTTP/1.1\r\nHost: " PUBLIC_HOST
+			   "\r\nConnection: close\r\n\r\n";
+	size_t	   total;
+	int	   sockfd, rc;
+	ssize_t	   n;
 
 	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
