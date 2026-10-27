@@ -291,12 +291,12 @@ definition files or CI workflows currently configured.
 Run the structural checker after updating the applicable instruction files:
 
 ```sh
-make check-agent-sync
+make check-agent-knowledge
 ```
 
 For committed changes in a pull-request range, use
-`make check-agent-sync BASE_REF=<target-branch-ref>`. The script
-`tools/check-agent-sync.pl` uses Perl and Git only. It
+`make check-agent-knowledge BASE_REF=<target-branch-ref>`. The script
+`scripts/validate-agent-knowledge.py` uses Python 3.11+ and Git only. It
 checks Git's changed paths, requires a substantive instruction diff, checks
 skill frontmatter and required policy sections, and verifies relative Markdown
 links. It checks structure rather than meaning; reviewers must still confirm

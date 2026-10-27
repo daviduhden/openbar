@@ -137,7 +137,7 @@ correct guidance that proved inaccurate. Keep examples and validation commands
 current, and remove obsolete or conflicting guidance. Add only knowledge that
 will help future work; do not record one-off execution details or cosmetic
 changes. Check referenced paths and commands, then run
-`make check-agent-sync` (or pass `BASE_REF=<git-ref>` for a CI change range).
+`make check-agent-knowledge` (or pass `BASE_REF=<git-ref>` for a CI change range).
 The checker verifies structure, changed-file coverage, and local references; a
 human semantic review must still confirm relevance. Report synchronization
 results and any unresolved limitation in the final summary.
