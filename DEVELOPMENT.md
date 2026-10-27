@@ -278,3 +278,29 @@ the test build. The OpenBSD units also need the Makefile's X11 include paths.
 
 OpenBSD KNF (`style(9)`), tabs for indentation, 80 columns, BSD function
 declarations, no comments that merely restate code.
+
+## Agent and skill maintenance
+
+Every repository change must include a substantive, relevant update to an
+`AGENTS.md`, specialized agent definition, or `SKILL.md`. The root
+`AGENTS.md` defines the required review, the nine-item Definition of Done, and
+the final synchronization report. The five skills under `.agents/skills/` each
+include their post-use maintenance procedure. There are no specialized agent
+definition files or CI workflows currently configured.
+
+Run the structural checker after updating the applicable instruction files:
+
+```sh
+make check-agent-sync
+```
+
+For committed changes in a pull-request range, use
+`make check-agent-sync BASE_REF=<target-branch-ref>`. The script
+`tools/check-agent-sync.pl` uses Perl and Git only. It
+checks Git's changed paths, requires a substantive instruction diff, checks
+skill frontmatter and required policy sections, and verifies relative Markdown
+links. It checks structure rather than meaning; reviewers must still confirm
+the instruction update captures relevant reusable knowledge. This repository
+has no CI configured, so a future CI workflow should call the checker with the
+pull request's target branch as `BASE_REF`. The local Make target is
+complementary and does not install hooks or alter branch protection.

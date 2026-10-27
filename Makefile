@@ -9,6 +9,7 @@
 # lldb(1) to debug.
 CC = clang
 DEBUGGER = lldb
+PYTHON ?= python3
 DBGFLAGS = -O0 -g
 
 CFLAGS ?= -O2 -pipe
@@ -93,6 +94,13 @@ tests/test_support.o: tests/test_support.c
 ${TEST_BINS}: ${TEST_OBJS} ${TEST_SRCS} openbar.h tests/test.h
 	${CC} ${CFLAGS} ${CPPFLAGS} ${TEST_CPPFLAGS} -o $@ $@.c ${TEST_OBJS}
 
+check-agent-sync:
+	@if [ -n "${BASE_REF}" ]; then \
+	    perl tools/check-agent-sync.pl --base-ref "${BASE_REF}"; \
+	else \
+	    perl tools/check-agent-sync.pl; \
+	fi
+
 test: ${TEST_BINS} test-locale
 	@CC="${CC}" CFLAGS="${CFLAGS}" sh compat/tests/run.sh
 	@CC="${CC}" CFLAGS="${CFLAGS}" FORCE=OPENBAR_STDCKDINT_FORCE_FALLBACK \
@@ -109,4 +117,5 @@ test-locale: ${TEST_BINS}
 clean:
 	rm -f ${PROG} ${PROG}_debug ${OBJS} ${TEST_BINS} ${TEST_OBJS}
 
-.PHONY: all rebuild debug install install-conf uninstall test test-locale clean
+.PHONY: all rebuild debug install install-conf uninstall test test-locale \
+	check-agent-sync clean
