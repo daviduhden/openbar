@@ -128,6 +128,21 @@ by the `Makefile` multi-target rule. The current suite does not test
 - Adding a directive without a host test because "it is trivial"; boundary and
   quoting errors are common regressions.
 
+## Maintenance & Continuous Learning
+
+After using this skill to modify the repository, review this skill and the
+applicable `AGENTS.md` instructions as part of the task's final synchronization
+pass. Update this skill when procedures, tools, configuration, behavior, or
+assumptions in its scope change; add reusable implementation knowledge and
+correct guidance that proved inaccurate. Keep examples and validation commands
+current, and remove obsolete or conflicting guidance. Add only knowledge that
+will help future work; do not record one-off execution details or cosmetic
+changes. Check referenced paths and commands, then run
+`make check-agent-sync` (or pass `BASE_REF=<git-ref>` for a CI change range).
+The checker verifies structure, changed-file coverage, and local references; a
+human semantic review must still confirm relevance. Report synchronization
+results and any unresolved limitation in the final summary.
+
 ## References
 
 - `config.c`
