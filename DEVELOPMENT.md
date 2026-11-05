@@ -296,7 +296,7 @@ make check-agent-knowledge
 
 For committed changes in a pull-request range, use
 `make check-agent-knowledge BASE_REF=<target-branch-ref>`. The script
-`scripts/validate-agent-knowledge.py` uses Python 3.11+ and Git only. It
+`scripts/validate-agent-knowledge.pl` uses Perl 5.14+ (JSON::PP core) and Git only. It
 checks Git's changed paths, requires a substantive instruction diff, checks
 skill frontmatter and required policy sections, and verifies relative Markdown
 links. It checks structure rather than meaning; reviewers must still confirm
