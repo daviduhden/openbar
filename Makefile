@@ -9,7 +9,6 @@
 # lldb(1) to debug.
 CC = clang
 DEBUGGER = lldb
-PYTHON ?= python3
 DBGFLAGS = -O0 -g
 
 CFLAGS ?= -O2 -pipe
@@ -96,9 +95,9 @@ ${TEST_BINS}: ${TEST_OBJS} ${TEST_SRCS} openbar.h tests/test.h
 
 check-agent-knowledge:
 	@if [ -n "${BASE_REF}" ]; then \
-		python3 scripts/validate-agent-knowledge.py --scope range --base "${BASE_REF}" --head HEAD; \
+		perl scripts/validate-agent-knowledge.pl --scope range --base "${BASE_REF}" --head HEAD; \
 	else \
-		python3 scripts/validate-agent-knowledge.py --scope worktree; \
+		perl scripts/validate-agent-knowledge.pl --scope worktree; \
 	fi
 
 test: ${TEST_BINS} test-locale
